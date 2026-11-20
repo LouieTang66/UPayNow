@@ -4,6 +4,8 @@
 
 <h1>UPayNow</h1>
 
+<p><strong>简体中文</strong> | <a href="README.en.md">English</a></p>
+
 <p><strong>源码可见 · 自部署 · 非托管加密货币支付网关</strong></p>
 
 <p>
