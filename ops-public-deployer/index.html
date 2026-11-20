@@ -1,0 +1,12 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>UPayNow 公共入口运维部署</title></head><body>
+<h1>公共入口运维部署（deterministic-v2）</h1>
+<p>仅连接钱包，不收集私钥。不需要 payout 或币种。部署需钱包支付 gas；先确认网络及固定发布参数。</p>
+<p>固定 ERC-2470：0xce0042B868300000d44A59004Da54A005ffdcf9f<br>固定公共入口：0x17F45EFf0a2cB4805180B62034F49c18d66e35EE</p>
+<label>Chain ID <input id="chain" type="number" min="1"></label><p><label>HTTPS RPC <input id="rpc" type="url" size="65" placeholder="https://…"></label></p>
+<button id="preview">只读预览</button> <button id="deploy" disabled>浏览器钱包部署</button> <button id="verify">只读核验（可恢复查询）</button>
+<h2>手机 OneKey 钱包部署</h2><p>使用 OneKey 钱包扫码，或在其内置浏览器打开链接。不需要 Reown ID。链接仅 5 分钟有效，请勿转发。手机不会收到 RPC 地址。</p>
+<button id="phone-create">生成手机扫码链接</button>
+<section id="phone-panel" hidden><p><img id="phone-qr" width="256" height="256" alt="OneKey 手机部署二维码"></p><p><a id="phone-link" rel="noreferrer" target="_blank">打开手机链接</a> <button id="phone-copy">复制链接</button></p><p id="phone-status" role="status"></p><button id="phone-close">关闭手机会话</button></section>
+<p>钱包返回哈希后不会自动重发。结果未知时先在钱包核对交易记录，再点击只读核验。过期或关闭不代表交易取消；不要重复发送。过期后请回桌面核验，不保证原手机链接仍可用。确认数与重组风险请运维另行核对。</p>
+<pre id="output" role="status"></pre><script src="/app.js"></script></body></html>

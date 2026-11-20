@@ -1,0 +1,27 @@
+name: 功能建议或扩链申请
+description: 描述使用场景与目标能力，不保证排期或任意网络可支持。
+title: "[建议] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请勿提交凭据、私钥、助记词或有效手机入口。
+        扩链申请不等于已支持，也不保证一定兼容；商业授权请联系 README 中的作者入口。
+  - type: textarea
+    id: need
+    attributes:
+      label: 使用场景及当前遇到的限制
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 希望实现的行为
+      description: 扩链请注明准确网络名称、Chain ID、官方资料及需要的代币 CA；不要发送含密钥的 RPC 地址。
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: 补充信息
+      description: 可列出相关公开资料、适用钱包或已有处理方式。不要提供真实实例备份。

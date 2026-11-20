@@ -1,0 +1,15 @@
+{
+  "scheme": "deterministic-v2",
+  "compiler": "0.8.38+commit.1835d247",
+  "settings": {
+    "optimizer": { "enabled": true, "runs": 200 },
+    "viaIR": true,
+    "evmVersion": "cancun"
+  },
+  "singleton": "0xce0042B868300000d44A59004Da54A005ffdcf9f",
+  "singletonRuntimeHash": "0xc4d5542b53a8b779595a20a8ddd60e58a6c49d3c3decc2df83ced1c69c8ca807",
+  "salt": "0x2076e89e7a47c93e9160bb36ba6858a6ae3c67654033caa33869a7ec845861a1",
+  "deployer": "0x17F45EFf0a2cB4805180B62034F49c18d66e35EE",
+  "creationCodeHash": "0x073788d7498025d9531d1a30d252e0b3e60ae95298f3c8e3eaedfa224b12aa29",
+  "runtimeCodeHash": "0xd2e68c7dc903a284b588340a133e987865a6dcbd20f3e36b81c0c76d076ee660"
+}

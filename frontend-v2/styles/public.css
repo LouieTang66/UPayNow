@@ -1,0 +1,56 @@
+/* UPayNow frontend-v2 · customer checkout and phone confirmation pages */
+body { background: #f3f4f6; }
+.public-root { min-height: 100vh; }
+.pub { width: min(520px, 100%); margin: 0 auto; padding: 20px 16px 40px; display: grid; gap: 14px; }
+.pub-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 2px; }
+.pub-head .who { display: flex; align-items: center; gap: 8px; font-weight: 600; min-width: 0; }
+.pub-head-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.pub-head .mark { width: 24px; height: 24px; flex-shrink: 0; border-radius: 6px; background: transparent; display: grid; place-items: center; }
+.pub-head .mark svg { display: block; width: 100%; height: 100%; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); }
+.panel-body { padding: 18px; display: grid; gap: 14px; }
+.panel-body + .panel-body { border-top: 1px solid var(--line); }
+.amount-hero { display: grid; gap: 2px; }
+.amount-hero .k { font-size: 13px; color: var(--text-3); }
+.amount-hero .v { font-size: 28px; font-weight: 650; line-height: 1.25; font-variant-numeric: tabular-nums; }
+.amount-hero .v small { font-size: 16px; font-weight: 600; color: var(--text-2); margin-left: 4px; }
+.pay-status { display: flex; gap: 12px; align-items: flex-start; padding: 14px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface-2); }
+.pay-status .t { font-weight: 600; }
+.pay-status .d { font-size: 13px; color: var(--text-3); margin-top: 2px; }
+.pay-status .dot { flex: none; width: 10px; height: 10px; border-radius: 50%; margin-top: 6px; background: var(--text-4); }
+.pay-status.ok { background: var(--ok-soft); border-color: var(--ok-line); }
+.pay-status.ok .dot { background: var(--ok); }
+.pay-status.warn { background: var(--warn-soft); border-color: var(--warn-line); }
+.pay-status.warn .dot { background: var(--warn); }
+.pay-status.info { background: var(--info-soft); border-color: var(--info-line); }
+.pay-status.info .dot { background: var(--info); }
+.pay-status.unknown { background: var(--unknown-soft); border-color: var(--unknown-line); }
+.pay-status.unknown .dot { background: var(--unknown); }
+.pay-status.danger { background: var(--danger-soft); border-color: var(--danger-line); }
+.pay-status.danger .dot { background: var(--danger); }
+.addr-box { display: grid; gap: 8px; padding: 14px; border: 1px dashed var(--line-strong); border-radius: 10px; background: var(--surface-2); }
+.addr-box .addr { font-family: var(--mono); font-size: 14px; word-break: break-all; line-height: 1.5; }
+.qr-pub { display: grid; place-items: center; }
+.qr-pub img, .qr-pub svg { width: 220px; height: 220px; border: 1px solid var(--line); border-radius: 10px; background: #fff; padding: 8px; }
+.facts { display: grid; gap: 10px; margin: 0; }
+.facts > div { display: flex; justify-content: space-between; gap: 16px; font-size: 13.5px; }
+.facts dt { color: var(--text-3); flex: none; }
+.facts dd { margin: 0; text-align: right; min-width: 0; word-break: break-all; }
+.warn-list { margin: 0; padding-left: 18px; color: var(--text-2); font-size: 13px; display: grid; gap: 4px; }
+.entry { display: grid; gap: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; }
+.entry .top { display: flex; justify-content: space-between; gap: 10px; font-weight: 500; }
+.entry .meta { font-size: 12.5px; color: var(--text-3); }
+.countdown { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--text-2); }
+.countdown.low { color: var(--warn); font-weight: 600; }
+.actions { display: grid; gap: 8px; }
+.btn.lg { height: 44px; font-size: 15px; }
+.pub-foot { text-align: center; font-size: 12px; color: var(--text-4); padding-top: 4px; }
+.facts dd { overflow: hidden; }
+.facts dd .copy { max-width: 100%; }
+.pub, .panel, .panel-body { min-width: 0; }
+.facts dd code { word-break: break-all; }
+.panel-body > *, .facts, .facts > div { min-width: 0; }
+.panel-body { grid-template-columns: minmax(0, 1fr); }
+/* Keep full addresses and long error text inside phone notices, without clipping. */
+.pub .notice { min-width: 0; overflow-wrap: anywhere; }
+.pub .notice .notice-body { grid-template-columns: minmax(0, 1fr); }

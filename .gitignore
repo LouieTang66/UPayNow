@@ -1,0 +1,37 @@
+# Operating-system metadata
+.DS_Store
+._*
+.AppleDouble
+
+# Dependencies and reproducible build output
+node_modules/
+/node_modules
+artifacts/
+cache/
+coverage/
+frontend-v2/dist/
+
+# Instance data, credentials and logs are never product source
+/backend/state/
+/data/
+.env
+.env.*
+!.env.example
+*.secret
+auth.json
+auth.json.*.tmp
+upaynow-recovery-key*.txt
+upaynow-api-key*.txt
+*.sqlite
+*.sqlite-*
+*.pem
+*.key
+*.log
+
+# Local tooling
+__pycache__/
+*.py[cod]
+.venv/
+
+# Retired UI must not re-enter the product
+backend/public/

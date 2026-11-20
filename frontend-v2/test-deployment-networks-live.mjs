@@ -1,0 +1,98 @@
+// Actual-source UI regression; no browser/server, state, or wallet access.
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import vm from 'node:vm';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+const { OPEN_NETWORKS } = require('../backend/deployment-networks.cjs');
+const apiSource = await fs.readFile(new URL('./src/shared/api.js',import.meta.url),'utf8');
+const { liveClient } = await import('data:text/javascript;base64,' + Buffer.from(apiSource).toString('base64'));
+const source = (await fs.readFile(new URL('./src/admin/pages/chains.js',import.meta.url),'utf8')).replace(/^import .*;\n/gm,'').replaceAll('export ','');
+const h=(tag,attrs,...children)=>({tag,attrs:attrs||{},children:children.flat(Infinity).filter(x=>x!==null&&x!==undefined)});
+const flatten = nodes => nodes.flatMap(n => n && typeof n === 'object' ? [n,...flatten(n.children||[])] : []);
+async function fixture(fail=false) {
+  let resolve, reject;
+  const pending = new Promise((a,b)=>{resolve=a;reject=b;});
+  const d={closed:false,setTitle(){},setBody(...n){this.body=n;},setFoot(...n){this.foot=n;},close(){this.closed=true;}};
+  const posts=[];
+  globalThis.fetch = async (url,options) => {
+    assert.equal(url,'/api/deployment-networks');
+    assert.equal(options.credentials,'same-origin');
+    assert.equal(options.headers['X-Upay-Deployment'],undefined);
+    return new Response(JSON.stringify(await pending),{headers:{'Content-Type':'application/json'}});
+  };
+  const app={client:{...liveClient(),post:async(route,body)=>{posts.push({route,body});if(route==='deterministic/preview') throw Error('STOP_PREVIEW');return {id:'old'};}},refreshDeployments:async()=>{},selectDeployment(){}};
+  const context=vm.createContext({URL,console,h,field:(label,control)=>h('field',{label},control),notice:(...n)=>h('notice',{},...n),openDialog:()=>d,CHAINS:{1:{name:'Ethereum',native:'ETH'},56:{name:'BSC',native:'BNB'},8453:{name:'Base',native:'ETH'},42161:{name:'Arbitrum',native:'ETH'},137:{name:'Polygon',native:'POL'}},chainName:id=>'Chain '+id,errorText:x=>x,toast(){},busy:async(button,fn)=>fn()});
+  vm.runInContext(source+'\nglobalThis.open=openAddChain;',context);
+  context.open(app,{chainId:56,nativeSymbol:'BNB',rpcUrl:'https://old.invalid',payout:'0x'+'11'.repeat(20),tokens:['0x'+'22'.repeat(20)]});
+  const button=()=>d.foot.at(-1), field=label=>flatten(d.body).find(n=>n.tag==='field'&&n.attrs.label===label)?.children[0];
+  assert.equal(field('部署模式'),undefined);
+  assert.equal(field('合约版本（仅导入）'),undefined);
+  assert(flatten(d.body).some(n=>n.tag==='summary'&&n.children.includes('高级／历史兼容：导入已有合约')));
+  assert.equal(button().attrs.disabled,true);
+  if(fail) reject(Error('offline')); else resolve(structuredClone(OPEN_NETWORKS));
+  await new Promise(r=>setImmediate(r));
+  const toggle=()=>flatten(d.body).find(n=>n.tag==='input'&&n.attrs.type==='checkbox');
+  if(fail){assert.equal(button().attrs.disabled,true);assert(JSON.stringify(d.body).includes('名单加载失败'));toggle().attrs.onchange({target:{checked:true}});assert.equal(button().attrs.disabled,false);return;}
+  assert.deepEqual(field('网络').children.map(n=>n.attrs.value),['','56','42161','8453','9745','196','97','11155111']);
+  assert.equal(field('网络').children.find(n=>n.attrs.value==='97').children[0],'BSC Testnet（测试网） · 97');
+  assert.equal(field('网络').children.find(n=>n.attrs.value==='11155111').children[0],'Ethereum Sepolia（测试网） · 11155111');
+  assert.equal(field('Chain ID').attrs.value,'56'); // BSC mainnet is now admitted.
+  assert.equal(field('gas 原生币符号').attrs.value,'BNB');
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS[0].defaultRPC);
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].body.chainId,56); assert.equal(posts[0].body.scheme,'deterministic-v2'); posts.length=0;
+  field('网络').attrs.onchange({target:{value:'42161'}});
+  assert.equal(field('Chain ID').attrs.value,'42161'); assert.equal(field('Chain ID').attrs.readonly,true);
+  assert.equal(field('gas 原生币符号').attrs.value,'ETH');
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS.find(n=>n.chainId===42161).defaultRPC);
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].body.chainId,42161); assert.equal(posts[0].body.scheme,'deterministic-v2'); posts.length=0;
+  field('网络').attrs.onchange({target:{value:'8453'}});
+  assert.equal(field('Chain ID').attrs.value,'8453'); assert.equal(field('Chain ID').attrs.readonly,true);
+  assert.equal(field('gas 原生币符号').attrs.value,'ETH');
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS.find(n=>n.chainId===8453).defaultRPC);
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].body.chainId,8453); assert.equal(posts[0].body.scheme,'deterministic-v2'); posts.length=0;
+  field('网络').attrs.onchange({target:{value:'9745'}});
+  assert.equal(field('Chain ID').attrs.value,'9745'); assert.equal(field('Chain ID').attrs.readonly,true);
+  assert.equal(field('gas 原生币符号').attrs.value,'XPL');
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS.find(n=>n.chainId===9745).defaultRPC);
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].body.chainId,9745); assert.equal(posts[0].body.scheme,'deterministic-v2'); posts.length=0;
+  field('网络').attrs.onchange({target:{value:'196'}});
+  assert.equal(field('Chain ID').attrs.value,'196'); assert.equal(field('Chain ID').attrs.readonly,true);
+  assert.equal(field('gas 原生币符号').attrs.value,'OKB');
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS.find(n=>n.chainId===196).defaultRPC);
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].body.chainId,196); assert.equal(posts[0].body.scheme,'deterministic-v2'); posts.length=0;
+  field('网络').attrs.onchange({target:{value:'97'}});
+  assert.equal(field('Chain ID').attrs.value,'97'); assert.equal(field('Chain ID').attrs.readonly,true);
+  assert.equal(field('gas 原生币符号').attrs.value,'tBNB');assert.equal(field('gas 原生币符号').attrs.readonly,true);
+  assert.equal(field('RPC 地址（HTTPS）').attrs.value,OPEN_NETWORKS.find(n=>n.chainId===97).defaultRPC);
+  assert(flatten(d.body).some(n=>n.tag==='details'));
+  // Switch to old import: custom controls remain available. Switching back clears stale chain/RPC.
+  toggle().attrs.onchange({target:{checked:true}});
+  assert.equal(field('Chain ID').attrs.readonly,false);
+  field('合约版本（仅导入）').attrs.onchange({target:{value:'legacy-v1'}});
+  field('网络').attrs.onchange({target:{value:'56'}});
+  assert.equal(field('Chain ID').attrs.value,'56');
+  toggle().attrs.onchange({target:{checked:false}});
+  assert.equal(field('Chain ID').attrs.value,'');assert.equal(field('RPC 地址（HTTPS）').attrs.value,'');
+  assert.equal(field('合约版本（仅导入）'),undefined);
+  assert(!flatten(d.body).some(n=>n.tag==='option'&&n.attrs.value==='legacy-v1'));
+  field('网络').attrs.onchange({target:{value:'97'}});
+  await assert.rejects(button().attrs.onclick({currentTarget:{}}),{message:'STOP_PREVIEW'});
+  assert.equal(posts[0].route,'deterministic/preview');assert.equal(posts[0].body.scheme,'deterministic-v2');posts.length=0;
+  field('网络').attrs.onchange({target:{value:''}});
+  await button().attrs.onclick({currentTarget:{}});assert.equal(posts.length,0);
+  toggle().attrs.onchange({target:{checked:true}});
+  field('合约版本（仅导入）').attrs.onchange({target:{value:'legacy-v1'}});
+  field('网络').attrs.onchange({target:{value:''}});
+  for(const [label,value] of [['Chain ID','31337'],['gas 原生币符号','ETH'],['RPC 地址（HTTPS）','https://custom.invalid'],['已有 Factory 地址','0x'+'33'.repeat(20)]]) field(label).attrs.oninput({target:{value}});
+  await button().attrs.onclick({currentTarget:{}});
+  assert.equal(posts.length,1);assert.equal(posts[0].route,'deployments/import');assert.equal(posts[0].body.chainId,31337);assert.equal(posts[0].body.scheme,'legacy-v1');
+}
+const originalFetch = globalThis.fetch;
+try { await fixture();await fixture(true); } finally { globalThis.fetch = originalFetch; }
+console.log('PASS actual chains UI: authenticated list consumer, only open options, read-only identity/gas, advanced RPC, stale switch reset, fail-closed load, unrestricted custom import.');

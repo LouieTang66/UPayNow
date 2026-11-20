@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 安全漏洞私下反馈
+    url: mailto:hi@louie66.com
+    about: 不公开漏洞利用细节、凭据或敏感实例数据；也可通过 README 中的 Telegram 联系作者。

@@ -1,0 +1,55 @@
+{
+  "name": "upaynow-product",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "test": "npm run compile && hardhat run --no-compile test/self-hosted.cjs && npm run test:crosschain && npm run test:compat && npm run test:product",
+    "test:crosschain": "node --test test/deterministic-release.test.cjs && node test/crosschain.cjs",
+    "test:compat": "node test/compatibility.cjs cancun && node test/compatibility.cjs shanghai",
+    "test:fork": "npm run compile && node test/fork.cjs ethereum && node test/fork.cjs bsc",
+    "compile": "hardhat compile",
+    "build:input": "node scripts/build-input.cjs",
+    "build:frontend": "node frontend-v2/scripts/build.mjs",
+    "backend:start": "npm start",
+    "pretest:backend": "npm run compile && npm run build:frontend",
+    "test:backend": "node --test backend/test/*.test.cjs",
+    "test:frontend-v2": "node --test frontend-v2/test-*-live.mjs",
+    "start": "node backend/server.cjs",
+    "recovery-key": "node scripts/recovery-key.cjs",
+    "prestart": "npm run build",
+    "build": "npm run compile && npm run build:frontend",
+    "test:product": "node --test test/product-package.test.cjs test/blank-install.test.cjs"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2",
+    "hardhat": "2.26.3",
+    "solc": "0.8.38"
+  },
+  "dependencies": {
+    "@walletconnect/universal-provider": "2.26.0",
+    "ethers": "6.17.0",
+    "qrcode": "1.5.4"
+  },
+  "description": "Self-hosted merchant payments with wallet-approved contract deployment and collection",
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "files": [
+    "backend/*.cjs",
+    "ops-public-deployer/*.cjs",
+    "ops-public-deployer/*.js",
+    "ops-public-deployer/*.html",
+    "ops-public-deployer/README.md",
+    "frontend-v2/pages/",
+    "frontend-v2/src/",
+    "frontend-v2/styles/",
+    "frontend-v2/scripts/build.mjs",
+    "frontend-v2/brand/",
+    "contracts/",
+    "scripts/",
+    "hardhat.config.cjs",
+    "docs/",
+    "README.md",
+    ".env.example"
+  ]
+}
