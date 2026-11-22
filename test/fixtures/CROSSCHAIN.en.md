@@ -2,7 +2,7 @@
 
 [简体中文](CROSSCHAIN.md) | **English**
 
-These are isolated test commands and scenario notes for maintainers, not mainnet deployment steps. This documentation update does not imply these tests were rerun. The build commands write local inputs or artifacts; read [Development and Isolation Checks](../../docs/DEVELOPMENT.en.md) first.
+These are isolated test commands and scenario notes for maintainers, not mainnet deployment steps. The build commands write local inputs or artifacts; read [Development and Isolation Checks](../../docs/DEVELOPMENT.en.md) first.
 
 ```sh
 npm run build:input

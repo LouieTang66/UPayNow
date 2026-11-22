@@ -37,8 +37,8 @@
 
 重新构建或替换页面不应删除状态、密钥、历史部署、订单和交易哈希，也不会升级链上不可变合约。备份、更新、代理和进程托管均由部署者负责，不新增内建运维产品，不允许两进程共享同一数据目录。
 
-实体钱包、WalletConnect relay、手机内置浏览器、EIP-681、目标链和真实 HTTPS 都需独立确认。前端改善不能自动消除历史后端候选哈希、RPC 秘密、deploymentId 冲突或崩溃恢复风险；这些是 [安全文档](../docs/SECURITY.md) 中的待最终复核线索，不作为已修复声明。
+实体钱包、WalletConnect relay、手机内置浏览器、EIP-681、目标链和真实 HTTPS 都需独立确认。前端改善不能自动消除历史后端候选哈希、RPC 秘密、deploymentId 冲突或崩溃恢复风险；这些是 [安全文档](../docs/SECURITY.md) 中的待复核事项。
 
 ## 开发者自动化检查
 
-`npm run test:frontend-v2`、`npm run test:backend` 和 `npm test` 分别是前端、后端和合约回归入口。检查应使用隔离数据，不属于用户充值/付款步骤，不代替实体手机、生产 TLS、主网或独立审计验收。
+`npm run test:frontend-v2`、`npm run test:backend` 和 `npm test` 分别是前端、后端和合约回归入口。检查应使用隔离数据。

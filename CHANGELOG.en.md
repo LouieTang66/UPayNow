@@ -17,5 +17,3 @@
 - Add the official Elastic License 2.0 text and third-party and build licensing notes. Retain existing third-party notices and deterministic build inputs.
 - Add a private security reporting channel and GitHub issue templates.
 - Add Chinese and English editions of the project documentation and link between them.
-
-These notes describe changes being prepared; they do not indicate that a new version has been released, a server deployed, on-chain contracts changed, or mainnet and physical-wallet acceptance completed.

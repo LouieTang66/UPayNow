@@ -37,8 +37,8 @@ The service persists UNKNOWN before submission and registers the original transa
 
 Rebuilding or replacing pages should not delete state, secrets, historical deployments, orders, or transaction hashes. It does not upgrade immutable on-chain contracts. Deployers handle backups, updates, proxies, and process supervision. No built-in operations service has been added, and two processes must not share one data directory.
 
-Verify physical wallets, the WalletConnect relay, mobile wallet browsers, EIP-681, target chains, and real HTTPS independently. Frontend improvements do not remove outstanding backend concerns involving candidate transaction hashes, RPC secrets, deploymentId conflicts, or crash recovery. See the [security guide](../docs/SECURITY.en.md); these issues are not claimed fixed.
+Verify physical wallets, the WalletConnect relay, mobile wallet browsers, EIP-681, target chains, and real HTTPS independently. Frontend improvements do not remove outstanding backend concerns involving candidate transaction hashes, RPC secrets, deploymentId conflicts, or crash recovery. See the [security guide](../docs/SECURITY.en.md).
 
 ## Automated development checks
 
-`npm run test:frontend-v2`, `npm run test:backend`, and `npm test` exercise the frontend, backend, and contracts, respectively. Use isolated data. These checks are not top-up or payment steps, and do not replace acceptance testing with physical phones, production TLS, mainnet, or an independent audit.
+`npm run test:frontend-v2`, `npm run test:backend`, and `npm test` exercise the frontend, backend, and contracts, respectively. Use isolated data.

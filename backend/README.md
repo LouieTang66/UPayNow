@@ -116,4 +116,4 @@ curl --fail-with-body -X POST "$BASE_URL/api/orders/$ORDER_ID/accept-late-paymen
 
 ## 开发者自动化检查
 
-后台回归入口 `npm run test:backend`；前端 `npm run test:frontend-v2`；合约 `npm test`。这些不属于商户使用步骤，测试必须与商户状态隔离，结果不等于实体钱包或主网验收。安全限制见 [SECURITY.md](../docs/SECURITY.md)。
+后台回归入口 `npm run test:backend`；前端 `npm run test:frontend-v2`；合约 `npm test`。测试必须与商户状态隔离。安全限制见 [SECURITY.md](../docs/SECURITY.md)。

@@ -28,14 +28,14 @@ To upgrade, recheck the official metadata and manually update the version and fu
 
 ## UI error codes (all HTTP 502)
 
-| Code | Chinese suggestion | English suggestion |
-| --- | --- | --- |
-| CLOUDFLARED_NOT_FOUND | 指定的 cloudflared 不存在或无法运行，请检查配置。 | The configured cloudflared is missing or cannot run. Check its configuration. |
-| CLOUDFLARED_UNSUPPORTED_PLATFORM | 当前系统/架构不支持自动下载，请手动配置 cloudflared。 | Automatic cloudflared download is unavailable for this platform. Configure it manually. |
-| CLOUDFLARED_DOWNLOAD_FAILED | 手机连接组件下载失败，请检查网络后重试。 | Could not download the mobile connection component. Check your network and retry. |
-| CLOUDFLARED_INTEGRITY_FAILED | 手机连接组件校验失败，未执行该组件，请重试。 | Mobile connection component integrity check failed. It was not executed. Retry. |
-| CLOUDFLARED_CACHE_FAILED | 无法写入手机连接组件缓存，请检查数据目录权限与磁盘空间。 | Cannot write the mobile connection component cache. Check data-directory permissions and free disk space. |
-| TUNNEL_CLOSED | 手机连接已关闭，请重新打开。 | The mobile connection was closed. Open it again. |
+| Code | English suggestion |
+| --- | --- |
+| CLOUDFLARED_NOT_FOUND | The configured cloudflared is missing or cannot run. Check its configuration. |
+| CLOUDFLARED_UNSUPPORTED_PLATFORM | Automatic cloudflared download is unavailable for this platform. Configure it manually. |
+| CLOUDFLARED_DOWNLOAD_FAILED | Could not download the mobile connection component. Check your network and retry. |
+| CLOUDFLARED_INTEGRITY_FAILED | Mobile connection component integrity check failed. It was not executed. Retry. |
+| CLOUDFLARED_CACHE_FAILED | Cannot write the mobile connection component cache. Check data-directory permissions and free disk space. |
+| TUNNEL_CLOSED | The mobile connection was closed. Open it again. |
 
 Offline verification (cloudflared is not required and no public tunnel is opened):
 

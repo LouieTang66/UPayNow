@@ -12,13 +12,13 @@ A standalone frontend server is not needed. The backend serves the admin pages, 
 
 ## Pages and features
 
-- **Overview (总览):** Orders, payments, and items needing attention for the current deployment.
-- **Orders (订单):** Order lookup, payment history, original amount and token contract address, checkout links, and related collection records. Amounts in different tokens are not aggregated into USD.
-- **Collection (归集):** Collectible funds, exception recovery, and collection history. Preview a batch and confirm it on mobile or with a desktop wallet. Collection of other supported tokens and explicitly confirmed wrong-token handling remain available.
-- **Payment notifications (付款通知):** Check delivery and requeue eligible notifications. A displayed success does not prove the store fulfilled the order.
-- **Chains and contracts (链与合约):** Add or import your own Factory, inspect on-chain identity and deployment records, and change the display name without changing the contract. New merchant deployments use deterministic-v2 on admitted networks only. Selecting a network fills its preset RPC. The operator predeploys the public entry point, which is verified; the signing wallet must be the fixed payout. The fixed payout and token list are immutable after deployment. Redeploying on the same chain with the same payout and version cannot add tokens. A different payout creates a separate deployment; retain the old one. Historical contracts can be imported after verification.
-- **Store integration (商城接入):** The store server creates orders through the API, verifies signatures, deduplicates notifications, and fulfills orders idempotently. See [store integration](../backend/README.en.md). Do not provide admin credentials to customer-facing pages.
-- **Settings (设置):** Password, recovery key, separate API credential, and wallet connection. Optional WalletConnect requires the deployer's own Reown Project ID; injected wallets and dedicated phone pages do not. “Utilities → Create an order manually” (辅助工具 → 手动创建一笔订单) is for testing or one-off replacement orders. Create regular production orders through the store API.
+- **Overview:** Orders, payments, and items needing attention for the current deployment.
+- **Orders:** Order lookup, payment history, original amount and token contract address, checkout links, and related collection records. Amounts in different tokens are not aggregated into USD.
+- **Sweep:** Collectible funds, exception recovery, and collection history. Preview a batch and confirm it on mobile or with a desktop wallet. Collection of other supported tokens and explicitly confirmed wrong-token handling remain available.
+- **Payment webhooks:** Check delivery and requeue eligible notifications. A displayed success does not prove the store fulfilled the order.
+- **Chains and contracts:** Add or import your own Factory, inspect on-chain identity and deployment records, and change the display name without changing the contract. New merchant deployments use deterministic-v2 on admitted networks only. Selecting a network fills its preset RPC. The operator predeploys the public entry point, which is verified; the signing wallet must be the fixed payout. The fixed payout and token list are immutable after deployment. Redeploying on the same chain with the same payout and version cannot add tokens. A different payout creates a separate deployment; retain the old one. Historical contracts can be imported after verification.
+- **Store integration:** The store server creates orders through the API, verifies signatures, deduplicates notifications, and fulfills orders idempotently. See [store integration](../backend/README.en.md). Do not provide admin credentials to customer-facing pages.
+- **Settings:** Password, recovery key, separate API credential, and wallet connection. Optional WalletConnect requires the deployer's own Reown Project ID; injected wallets and dedicated phone pages do not. “Utilities → Create an Order Manually” is for testing or one-off replacement orders. Create regular production orders through the store API.
 
 The deployment selector sets the active admin context. Switching does not stop scanning other deployments, rewrite original orders, or change a Factory or payout. Collection stays bound to the deployment selected when it started. Switching networks must not redirect the funds.
 
@@ -32,8 +32,8 @@ Another wallet may pay gas for ordinary collection; funds still go only to the f
 
 Sign-in uses an HttpOnly server session. The frontend does not persist passwords, recovery keys, or API credentials. The short-lived mobile capability can be stored in the current tab's sessionStorage for reload recovery, but is not permanent. The server controls expiry and invalidation.
 
-The frontend does not replace server-side verification of assets and chain identity, the store inventory system, or fulfillment transactions. It does not certify mainnet readiness, compatibility with physical wallets, or independent security auditing. Outstanding backend review items are listed in the [security guide](../docs/SECURITY.en.md).
+The frontend does not replace server-side verification of assets and chain identity, the store inventory system, or fulfillment transactions. Outstanding backend review items are listed in the [security guide](../docs/SECURITY.en.md).
 
 ## Development: build and checks
 
-Run `npm run build` from the project root. Production services mount the generated `frontend-v2/dist` directly. The frontend bundles its wallet adapter separately. `npm run test:frontend-v2` is a developer regression check, not a merchant payment or top-up step, and does not certify physical wallets, TLS, or mainnet operation.
+Run `npm run build` from the project root. Production services mount the generated `frontend-v2/dist` directly. The frontend bundles its wallet adapter separately. `npm run test:frontend-v2` runs frontend regression checks.

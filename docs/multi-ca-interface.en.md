@@ -2,15 +2,15 @@
 
 [简体中文](multi-ca-interface.md) | **English**
 
-Repository: <https://github.com/LouieTang66/UPayNow>. This guide documents the current `ForwarderFactory` / `ForwarderImpl` source interfaces; it is not a UI design proposal. The v3 in the title means the multi-CA contract's `SALT_VERSION=3`, not the application's `deterministic-v2` deployment version. This guide is for developers integrating directly with contracts. Deployers should start with [Installation](INSTALLATION.en.md) and the [Operations Manual](OPERATIONS.en.md); stores should prefer the [Server API](../backend/README.en.md). No Factory, payout, or asset is preset. Interface examples do not replace actual deployment configuration. This guide does not establish mainnet acceptance or completion of a security audit.
+Repository: <https://github.com/LouieTang66/UPayNow>. This guide documents the `ForwarderFactory` / `ForwarderImpl` interfaces. The v3 in the title means the multi-CA contract's `SALT_VERSION=3`, not the application's `deterministic-v2` deployment version. This guide is for developers integrating directly with contracts. Deployers should start with [Installation](INSTALLATION.en.md) and the [Operations Manual](OPERATIONS.en.md); stores should prefer the [Server API](../backend/README.en.md). No Factory, payout, or asset is preset. Interface examples do not replace actual deployment configuration.
 
 ## In Plain Language
 
 A Factory takes the following at deployment:
 
 ```text
-固定商户收款钱包
-支持的 CA 列表，例如本链核实后的 USDT、USDC
+Fixed merchant payout wallet
+Supported token contract addresses, such as USDT and USDC verified on this network
 ```
 
 That is, a fixed merchant payout wallet and a list of supported token contract addresses (CAs), such as the chain-specific addresses for USDT and USDC after verification.
@@ -58,7 +58,7 @@ getSettlementTokens() -> address[]
 isSupportedToken(address token) -> bool
 predictAddress(bytes32 orderIdHash) -> address
 computeSalt(bytes32 orderIdHash) -> bytes32
-SALT_VERSION() -> uint8，当前为3
+SALT_VERSION() -> uint8 (currently 3)
 implementation() -> address
 forwarderCodehash() -> bytes32
 isForwarder(address forwarder) -> bool
@@ -112,7 +112,7 @@ hub() -> address
 payout() -> address
 sweepSettlementToken(address token) -> uint256 amount
 sweepWrongToken(address token) -> uint256 amount
-receive()：接收原生币的特殊入口
+receive(): special entry point that accepts the native asset
 ```
 
 `receive()` is the special entrypoint for native currency. The two sweep methods allow only the fixed hub, which is the Factory that created the implementation. The Factory validates the allowlist before choosing the standard or wrong-token path. The forwarder template neither stores nor changes the list. It has no initializer, redirection, administrator, arbitrary call, or upgrade interface.
@@ -141,23 +141,23 @@ If tokenA fails but tokenB succeeds on the same order, tokenB's deployment or re
 This example is illustrative, without real configuration or secret keys. It is not a running production backend.
 
 ```js
-// 业务订单映射必须保存；哈希规则固定且不重用。
+// Persist the business-order mapping; use a stable hashing scheme and never reuse a hash.
 const orderHash = ethers.id('upaynow:merchant-id:unique-order-id');
 const address = await factory.predictAddress(orderHash);
 
-// 商家后台开单时决定唯一认单币种与金额；当前收银台不切换订单币种。
-// 等符合你的付款/确认策略后，只归集指定 CA。
+// The store sets a single payment asset and amount at order creation; checkout cannot change the asset.
+// After the payment meets your confirmation policy, sweep only the specified token contract.
 const tx = await factory.collect(orderHash, USDT_CA);
 const receipt = await tx.wait();
-// 解析正确 Factory 的 Collected，核对 token/order/address。
+// Decode Collected from the correct Factory and verify the token, order, and address.
 
-// 同一 Factory 的批量输入：
+// Batch inputs for the same Factory:
 const tx2 = await factory.collectBatch([
   { orderIdHash: ORDER_A, token: USDT_CA },
   { orderIdHash: ORDER_B, token: USDC_CA },
 ]);
 const receipt2 = await tx2.wait();
-// status=1 只代表外层成功，还要查逐项事件/结果。
+// status=1 means the outer transaction succeeded; check the events and results for each item.
 ```
 
 Persist the business order mapping and keep hash rules fixed without reusing hashes. The backend sets the one accepted asset and amount at order creation; checkout does not change the order's asset. Collect only the specified CA once payment meets the confirmation policy. Parse Collected from the correct Factory and match token, order, and address. Use one Factory per batch and inspect each item's events or results even when status=1.

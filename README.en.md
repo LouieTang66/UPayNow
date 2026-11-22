@@ -86,7 +86,7 @@ The default administration URL is `http://127.0.0.1:8790`. On first startup, use
 
 ### 2. Configure a payment network
 
-Open **链与合约** (chains and contracts), click **添加链** (add chain), and select an available network. RPC, Chain ID, and the native Gas token symbol are filled in automatically; you do not need to enter them manually. Enter your fixed payout wallet and the exact token contract addresses, then review the required payment confirmations. Custom RPC configuration is optional and available in advanced settings.
+Open **Chains and contracts**, click **Add Chain**, and select an available network. RPC, Chain ID, and the native Gas token symbol are filled in automatically; you do not need to enter them manually. Enter your fixed payout wallet and the exact token contract addresses, then review the required payment confirmations. Custom RPC configuration is optional and available in advanced settings.
 
 Use the fixed payout wallet to approve deployment of the merchant contracts and pay the network Gas fee. The shared deployment entrypoint is prepared by the maintainer; merchants do not need to deploy it separately. You may also import existing contracts that have been verified as compatible with the current version.
 

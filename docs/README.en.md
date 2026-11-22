@@ -34,7 +34,7 @@ Payment recognition, notification delivery, store fulfillment, and collection ar
 
 - [Development and isolated checks](DEVELOPMENT.en.md): builds, focused tests, pinned release inputs, and what each kind of test does and does not verify.
 - [Public deployment tool](../ops-public-deployer/README.en.md): preflight checks and public bootstrap before admitting a network. This is not a first-time merchant setup step.
-- [Deterministic cross-chain development tests](../test/fixtures/CROSSCHAIN.en.md): isolated testing, not acceptance of any production network, physical wallet, or real recovery.
+- [Deterministic cross-chain development tests](../test/fixtures/CROSSCHAIN.en.md): isolated cross-chain test scenarios.
 
 ## Licensing and versions
 

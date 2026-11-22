@@ -20,9 +20,9 @@ npm run test:backend
 npm run test:frontend-v2
 ```
 
-`npm run build` validates and compiles contract inputs and builds the frontend. It does not just build documentation. `test:backend` automatically runs `pretest:backend` first (compilation and frontend build). Frontend tests have no equivalent prebuild hook, so build before testing. These commands install dependencies or write build artifacts; listing them here does not mean they have been run. For small changes, prefer the relevant test files rather than rerunning the entire suite for a wording change.
+`npm run build` validates and compiles contract inputs and builds the frontend. It does not just build documentation. `test:backend` automatically runs `pretest:backend` first (compilation and frontend build). Frontend tests have no equivalent prebuild hook, so build before testing. These commands install dependencies or write build artifacts. For small changes, prefer the relevant test files rather than rerunning the entire suite for a wording change.
 
-The root commands `npm test`, `npm run test:crosschain`, and `npm run test:compat` are also development checks. Consult each script for its coverage and isolation requirements; there is no guarantee that a given run will pass. See [Frontend Development](../frontend-v2/README.en.md) for browser script entry points.
+The root commands `npm test`, `npm run test:crosschain`, and `npm run test:compat` are also development checks. Consult each script for its coverage and isolation requirements. See [Frontend Development](../frontend-v2/README.en.md) for browser script entry points.
 
 ## Deterministic Contracts and Cross-Chain Tests
 
@@ -36,7 +36,7 @@ Fork tests may access an external RPC. Public-network or mobile tests may create
 
 State what was actually run, its coverage, what it returned, and what was not run. Static source review, in-memory chain tests, browser tests, physical wallet tests, production HTTPS, and settlement on a real network are distinct kinds of evidence and cannot substitute for one another.
 
-Report static documentation checks separately from application builds. A build was rerun for this change, but this does not claim that the entire suite was rerun or that real funds recovery, mainnet, or physical-wallet acceptance was verified again.
+Report static documentation checks separately from application builds.
 
 ## Licensing and Distribution
 

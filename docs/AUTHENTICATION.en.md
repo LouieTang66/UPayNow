@@ -17,9 +17,9 @@ The service generates a random recovery key and a separate API credential for th
 The deployer can explicitly retrieve the key from the project root. Use `UPAY_DATA_DIR` or specify the data directory on the command line:
 
 ```sh
-npm run recovery-key -- /实际数据根目录
-# macOS/Windows 直接复制到剪贴板，不显示明文：
-npm run recovery-key -- --copy /实际数据根目录
+npm run recovery-key -- /path/to/data-directory
+# macOS and Windows: copy directly to the clipboard without showing the key.
+npm run recovery-key -- --copy /path/to/data-directory
 ```
 
 On macOS and Windows, `--copy` copies to the clipboard without displaying the plaintext. The tool only reads local files; it does not change passwords or create credentials. Do not share plaintext output in chats or logs.

@@ -51,8 +51,6 @@ The recovery UI must freeze the target deployment and original order identity th
 
 ## Acceptance requirements
 
-The following is an acceptance checklist, not a report that these tests were executed or passed during this documentation update.
-
 Use two independent local EVM chains with distinct chain IDs, distinct merchant transaction nonces and different approved token CAs. Bootstrap the same pinned deterministic deployer, demonstrate equal Factory/implementation/order addresses, transfer a real test token into the target-chain counterfactual address before code exists, then execute deployment and recovery to the fixed payout.
 
 Also cover unauthorized configuration/creation, proxy access, repeated deployment, mismatched token reuse, unsupported/counterfeit bootstrap code, cancellation/unknown transaction persistence, chain/scope changes, no source payment/webhook changes, and all legacy contract/backend regressions.

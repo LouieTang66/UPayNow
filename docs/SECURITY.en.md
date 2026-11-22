@@ -2,8 +2,6 @@
 
 [简体中文](SECURITY.md) | **English**
 
-This document is not a security audit and does not claim acceptance on mainnet, any target chain, or physical wallets. Historical development verification applies only to the versions and scope tested. It does not establish acceptance of this release, and a rewritten UI does not prove that all backend issues were fixed.
-
 See [Installation](INSTALLATION.en.md) for deployment and the [Operations Manual](OPERATIONS.en.md) for routine management, backups, and unknown-transaction recovery.
 
 ## Current Product Boundaries
@@ -48,7 +46,7 @@ For ordinary collection, another wallet may pay gas while the recipient stays fi
 - Recovery cannot bypass token freezes, transfer restrictions, incompatible chain instructions, or a target-chain payout the merchant does not control. The same textual smart-wallet address on another chain does not establish the same control. Collection event amounts do not represent the merchant's net settlement.
 - Recovery tasks are persisted and use the target deployment's concurrency controls, unknown-hash reconciliation, and reorganization checks. Switching chain or current deployment must not change an approved task's scope. Do not bypass an unknown outcome by creating another task.
 
-See [Cross-Chain Deterministic Deployment and Recovery](CROSSCHAIN-V2.md) for the design and local acceptance requirements. Passing local two-chain tests does not establish mainnet deployment, verification on a real mobile device, or independent auditing.
+See [Cross-Chain Deterministic Deployment and Recovery](CROSSCHAIN-V2.md) for the design and local acceptance requirements.
 
 ## Recovery and Privacy Boundaries to Check Before Launch
 

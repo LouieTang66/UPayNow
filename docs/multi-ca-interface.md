@@ -2,7 +2,7 @@
 
 **简体中文** | [English](multi-ca-interface.en.md)
 
-项目仓库：<https://github.com/LouieTang66/UPayNow>。此文是当前 `ForwarderFactory` / `ForwarderImpl` 源码接口说明，不是待实现的界面设计稿；标题 v3 指多 CA 合约的 `SALT_VERSION=3`，不等于应用部署方案 `deterministic-v2` 的版本号。此文面向需要直接接入合约的开发者；普通部署者从 [空白安装](INSTALLATION.md) 和 [完整操作手册](OPERATIONS.md) 开始，商城优先使用 [服务器 API](../backend/README.md)。没有预置 Factory、payout 或币种，接口示例不能代替真实部署配置。当前说明不代表主网验收或安全审计完成。
+项目仓库：<https://github.com/LouieTang66/UPayNow>。此文是当前 `ForwarderFactory` / `ForwarderImpl` 源码接口说明。标题 v3 指多 CA 合约的 `SALT_VERSION=3`，不等于应用部署方案 `deterministic-v2` 的版本号。此文面向需要直接接入合约的开发者；普通部署者从 [空白安装](INSTALLATION.md) 和 [完整操作手册](OPERATIONS.md) 开始，商城优先使用 [服务器 API](../backend/README.md)。没有预置 Factory、payout 或币种，接口示例不能代替真实部署配置。
 
 ## 先用简单的话说明
 

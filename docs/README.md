@@ -35,7 +35,7 @@
 - [开发与隔离检查](DEVELOPMENT.md)：构建、定向测试、固定发布输入与不同验收证据的边界。
 
 - [公共部署入口工具](../ops-public-deployer/README.md)：开放网络前的公共入口预检和部署。它不是商户初次使用的额外必做步骤。
-- [确定性跨链开发测试](../test/fixtures/CROSSCHAIN.md)：隔离测试背景，不代表任意生产网络、实体钱包或真实找回已验收。
+- [确定性跨链开发测试](../test/fixtures/CROSSCHAIN.md)：隔离跨链测试场景。
 
 ## 许可与版本
 

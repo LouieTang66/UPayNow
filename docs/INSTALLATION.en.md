@@ -8,7 +8,7 @@ This guide is for deployers. See the [Merchant Operations Manual](OPERATIONS.en.
 
 ## 1. Environment and Data Directory
 
-Use Node.js 22.19 or a newer compatible release with `node:sqlite`, npm, and a local filesystem that can persist SQLite data and enforce file permissions. Some Node releases warn that SQLite is experimental. A successful installation does not certify the database for production use.
+Use Node.js 22.19 or a newer compatible release with `node:sqlite`, npm, and a local filesystem that can persist SQLite data and enforce file permissions. Some Node releases warn that SQLite is experimental.
 
 Run under a dedicated service account. Before the first start, set `UPAY_DATA_DIR` to an absolute path for a protected persistent directory. Do not use a temporary or publicly served directory, unprotected removable media, or a directory shared with another instance. The default is `backend/state/`, relative to the project.
 

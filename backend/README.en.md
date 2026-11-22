@@ -6,7 +6,7 @@ Follow the [installation guide](../docs/INSTALLATION.en.md) to start with a blan
 
 ## Authentication and deployment scope
 
-The store **server** sends its separate API credential as `Authorization: Bearer <API credential>`. Retrieve it in Settings (设置) after reauthenticating with the current password. Neither the login password nor the recovery key works as a Bearer credential. The API credential grants broad business administration permissions, not least-privilege order creation, but cannot access password or credential-management endpoints. Never expose it to customer web pages. The admin console uses the password to establish an HttpOnly, SameSite=Strict cookie; browser write operations also require a same-origin Origin header. Neither changing the password nor resetting it with the recovery key changes the separate API credential. See [Authentication](../docs/AUTHENTICATION.en.md).
+The store **server** sends its separate API credential as `Authorization: Bearer <API credential>`. Retrieve it in Settings after reauthenticating with the current password. Neither the login password nor the recovery key works as a Bearer credential. The API credential grants broad business administration permissions, not least-privilege order creation, but cannot access password or credential-management endpoints. Never expose it to customer web pages. The admin console uses the password to establish an HttpOnly, SameSite=Strict cookie; browser write operations also require a same-origin Origin header. Neither changing the password nor resetting it with the recovery key changes the separate API credential. See [Authentication](../docs/AUTHENTICATION.en.md).
 
 `GET /api/deployments` returns `{deployments, defaultId}`. The `id` of each configured deployment is not its chain ID: a chain can have multiple Factories. Explicitly send `X-Upay-Deployment: <id>` for every deployment-scoped request. The server also understands `?deploymentId=<id>`, but do not mix scope sources. The default is `legacy` if unspecified. This identifies the root data instance and does not imply it is configured or uses an older UI. The create-order body can include `deploymentId`; always match the request header. Order reference idempotency is scoped to the selected deployment.
 
@@ -28,7 +28,7 @@ curl --fail-with-body "$BASE_URL/api/orders" \
 
 Leave `webhookUrl` empty to disable notifications for that order. When enabled, it must be your own HTTPS URL, with a hostname exactly allowlisted by `UPAY_WEBHOOK_HOSTS`. Use comma-separated hostnames without a scheme, path, or spaces. The empty default permits no external notifications. Notification endpoints must not resolve to private addresses; HTTP redirects are not followed.
 
-The response contains actual order details, including `id`, `deploymentId`, `address`, `chainId`, `factory`, `token`, `expectedUnits`, and `checkoutPath`. Append `checkoutPath` to your service's public origin and give the resulting URL to the customer. `/pay/:token` is the customer checkout route; never send admin credentials there. Use the store API for production orders. In the admin console, Settings → Utilities → Create an order manually (设置 → 辅助工具 → 手动创建一笔订单) is only for tests or making up a missed order. This guide does not provide a fabricated success response.
+The response contains actual order details, including `id`, `deploymentId`, `address`, `chainId`, `factory`, `token`, `expectedUnits`, and `checkoutPath`. Append `checkoutPath` to your service's public origin and give the resulting URL to the customer. `/pay/:token` is the customer checkout route; never send admin credentials there. Use the store API for production orders. In the admin console, Settings → Utilities → Create an Order Manually is only for tests or making up a missed order.
 
 ## Order lookup and idempotent fulfillment
 
@@ -116,4 +116,4 @@ Use the [Multichain Deployment API](MULTICHAIN.en.md) for new Factories. `POST /
 
 ## Developer automation checks
 
-Run `npm run test:backend` for backend regression checks, `npm run test:frontend-v2` for the frontend, and `npm test` for contracts. These are not merchant operating steps. Isolate tests from merchant state; local results do not establish acceptance on a physical wallet or mainnet. See the [Security Guide](../docs/SECURITY.en.md) for limitations.
+Run `npm run test:backend` for backend regression checks, `npm run test:frontend-v2` for the frontend, and `npm test` for contracts. Isolate tests from merchant state. See the [Security Guide](../docs/SECURITY.en.md) for limitations.
