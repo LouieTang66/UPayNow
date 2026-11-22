@@ -7,6 +7,7 @@ const { createEngine } = require('./engine.cjs');
 const { publicJob } = require('./job-view.cjs');
 const { AppError, requireValue } = require('./chain.cjs');
 const { Auth } = require('./auth.cjs');
+const { Epay, environment: epayEnvironment, submissionForm } = require('./epay.cjs');
 async function start(options = {}) {
   const dir = path.resolve(options.dir || process.env.UPAY_DATA_DIR || path.join(__dirname, 'state'));
   requireValue(options.localTestNoLogin !== true, 'NO_LOGIN_MODE_REMOVED');
@@ -18,7 +19,7 @@ async function start(options = {}) {
     handoffQuick: options.handoffQuick ?? process.env.UPAY_HANDOFF_MODE === 'quick' };
   const root = await createEngine(dir, engineOptions);
   const { store, merchant, wallet, handoff, hooks } = root;
-  let auth, deployments, deploymentService, deploymentHandoff, deploymentTimer, deploymentRefresh = Promise.resolve(), refreshingDeployments = false;
+  let auth, epay, deployments, deploymentService, deploymentHandoff, deploymentTimer, deploymentRefresh = Promise.resolve(), refreshingDeployments = false;
   try {
     auth = new Auth(dir);
     if (options.multiChain) {
@@ -41,6 +42,13 @@ async function start(options = {}) {
           for (const job of deploymentService.list()) if (job.candidateHash && job.state !== 'MINED') await deploymentService.refresh(job.id).catch(() => {});
         })().finally(() => { refreshingDeployments = false; });
       }, options.pollMs > 0 ? options.pollMs : 5000);
+    }
+    const epaySettings = options.epay === undefined ? epayEnvironment(process.env) : options.epay;
+    if (epaySettings) {
+      requireValue(deployments || !epaySettings.deploymentId || epaySettings.deploymentId === 'legacy', 'EPAY_DEPLOYMENT_UNAVAILABLE', 503);
+      const selected = deployments ? deployments.get(epaySettings.deploymentId || 'legacy') : root;
+      epay = new Epay(store, selected, epaySettings, publicOrigin);
+      selected.attachEpay(epay);
     }
   } catch (error) { clearInterval(deploymentTimer); await deploymentHandoff?.close(); await deployments?.close(); await root.close(); throw error; }
 
@@ -69,6 +77,11 @@ async function start(options = {}) {
       const url = new URL(request.url, origin), route = url.pathname;
       const isPost = request.method === 'POST', isGet = request.method === 'GET';
       if (isGet && route === '/health') return send(response, 200, { ok: true, version: 'merchant-v1', configured: merchant.status().configured });
+      if (epay && route === '/epay/submit.php') {
+        requireValue(origin === publicOrigin.origin, 'EPAY_PUBLIC_HOST_REQUIRED', 403);
+        const location = await epay.submit(await submissionForm(request, url));
+        return send(response, 303, '', { Location: location });
+      }
       const cookie = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('upay_session='))?.slice(13);
       const cookieHeader = (token = '') => ({ 'Set-Cookie': `upay_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? 28800 : 0}${origin.startsWith('https:') ? '; Secure' : ''}` });
       if (isGet && route === '/api/auth/status') return send(response, 200, auth.status());
@@ -99,12 +112,20 @@ async function start(options = {}) {
           const uri = `ethereum:${order.token}@${order.chainId}/transfer?address=${order.address}&uint256=${order.expectedUnits}`;
           return send(response, 200, await QRCode.toString(uri, { type: 'svg', margin: 2, width: 240 }), { 'Content-Type': 'image/svg+xml' });
         }
-        return send(response, 200, found.engine.merchant.detail(order, true));
+        const view = found.engine.merchant.detail(order, true);
+        const epayReturnUrl = epay?.engine === found.engine ? epay.returnFor(order) : null;
+        return send(response, 200, epayReturnUrl ? { ...view, epayReturnUrl } : view);
       }
       if (route.startsWith('/api/')) {
         const bearer = request.headers.authorization?.startsWith('Bearer ') && auth.bearer(request.headers.authorization.slice(7));
         requireValue(bearer || auth.session(cookie), 'UNAUTHORIZED', 401);
         if (!isGet && !bearer) requireValue(request.headers.origin === origin, 'ORIGIN_REQUIRED', 403);
+        if (isGet && route === '/api/epay/orders') {
+          requireValue(epay, 'NOT_FOUND', 404);
+          requireValue(url.searchParams.size === 1, 'INVALID_EPAY_ORDER');
+          if (url.searchParams.get('state') === 'RECONCILE') return send(response, 200, epay.reconciliations());
+          return send(response, 200, epay.order(url.searchParams.get('out_trade_no')));
+        }
         if (route.startsWith('/api/deployment')) {
           requireValue(deployments, 'MULTICHAIN_NOT_ENABLED', 409);
           if (isGet && route === '/api/deployment-networks') return send(response, 200, deploymentService.networks);
@@ -217,7 +238,7 @@ async function start(options = {}) {
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(options.port ?? Number(process.env.UPAY_PORT || 8790), '127.0.0.1', resolve); });
   } catch (error) { clearInterval(deploymentTimer); await deploymentHandoff?.close(); await deployments?.close(); await root.close(); throw error; }
-  return { server, merchant, hooks, store, handoff, deployments, deploymentService, deploymentHandoff, url: `http://127.0.0.1:${server.address().port}`,
+  return { server, merchant, hooks, store, handoff, epay, deployments, deploymentService, deploymentHandoff, url: `http://127.0.0.1:${server.address().port}`,
     close: async () => {
       clearInterval(deploymentTimer);
       await new Promise(resolve => server.close(resolve));

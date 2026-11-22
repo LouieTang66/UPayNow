@@ -83,6 +83,7 @@ function render() {
         h('div', { class: 'amount-hero' }, h('span', { class: 'k' }, '应付金额'), h('span', { class: 'v' }, amount(o.expectedAmount), h('small', null, o.symbol))),
         h('div', { class: ['pay-status', tone] }, h('span', { class: 'dot' }), h('div', null, h('div', { class: 't' }, title), desc ? h('div', { class: 'd' }, desc) : null)),
         failure ? notice('warn', '状态刷新暂时失败', '下方显示的是上一次读取的结果，页面会继续自动重试。') : null,
+        !failure && o.epayReturnUrl ? h('a', { class: 'btn', href: o.epayReturnUrl }, '返回充值站') : null,
         o.syncHealthy === false ? notice('warn', '到账状态可能有延迟', '商家后台正在同步链上记录，请稍后刷新，不要重复付款。') : null),
       closed ? null : h('div', { class: 'panel-body' },
         h('div', { class: 'qr-pub' }, h('img', { src: qr(), alt: '付款二维码', width: 220, height: 220 })),

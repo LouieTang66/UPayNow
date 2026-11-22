@@ -32,7 +32,7 @@ class Webhooks {
     requireValue(records.length > 0 && (local || records.every(r => publicIP(r.address))), 'WEBHOOK_PRIVATE_ADDRESS_DENIED');
     return { url, ip: records[0] };
   }
-  send(n) {
+  send(n, profile = null) {
     if (this.closing) return Promise.reject(new Error('WEBHOOK_CLOSED'));
     return new Promise((resolve, reject) => {
       let request, response, settled = false;
@@ -50,18 +50,30 @@ class Webhooks {
       // Both fulfillment and rejection are handled even after timeout/close.
       Promise.resolve().then(() => this.target(n.url)).then(({ url, ip }) => {
         if (settled || this.closing) return;
-        const payload = JSON.stringify(n.payload), timestamp = Math.floor(Date.now() / 1000).toString();
-        const signature = crypto.createHmac('sha256', this.secret).update(timestamp + '.' + payload).digest('hex');
+        if (profile?.beforeSend && !profile.beforeSend()) return finish(null, false);
+        const payload = profile ? profile.payload : JSON.stringify(n.payload);
+        const timestamp = Math.floor(Date.now() / 1000).toString();
+        const signature = profile ? null : crypto.createHmac('sha256', this.secret).update(timestamp + '.' + payload).digest('hex');
+        const headers = profile ? {
+          Accept: 'text/plain', 'Cache-Control': 'no-store', 'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(payload) } : {
+          'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
+          'X-Upaynow-Event': n.id, 'X-Upaynow-Timestamp': timestamp, 'X-Upaynow-Signature': signature };
         const transport = url.protocol === 'https:' ? https : http;
-        request = transport.request(url, { method: 'POST', autoSelectFamily: false,
-          lookup: (_hostname, _options, callback) => callback(null, ip.address, ip.family),
-          headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload),
-            'X-Upaynow-Event': n.id, 'X-Upaynow-Timestamp': timestamp, 'X-Upaynow-Signature': signature } }, incoming => {
+        request = transport.request(url, { method: profile?.method || 'POST', autoSelectFamily: false, headers,
+          lookup: (_hostname, _options, callback) => callback(null, ip.address, ip.family) }, incoming => {
           response = incoming;
           if (settled) { response.destroy(); return; }
-          let bytes = 0;
-          response.on('data', chunk => { bytes += chunk.length; if (bytes > 16384) finish(new Error('RESPONSE_TOO_LARGE')); });
-          response.on('end', () => finish(null, response.statusCode >= 200 && response.statusCode < 300));
+          let bytes = 0; const chunks = [];
+          response.on('data', chunk => {
+            bytes += chunk.length;
+            if (bytes > 16384) finish(new Error('RESPONSE_TOO_LARGE'));
+            else if (profile) chunks.push(chunk);
+          });
+          response.on('end', () => {
+            const code = response.statusCode;
+            finish(null, profile ? profile.accept(code, Buffer.concat(chunks).toString('utf8')) : code >= 200 && code < 300);
+          });
           response.on('error', error => finish(error));
           response.on('aborted', () => finish(new Error('RESPONSE_ABORTED')));
         });

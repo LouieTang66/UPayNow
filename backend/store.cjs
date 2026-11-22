@@ -24,7 +24,10 @@ class Store {
       CREATE TABLE IF NOT EXISTS anchors (number INTEGER PRIMARY KEY, hash TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, state TEXT NOT NULL, body TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS handoffs (id TEXT PRIMARY KEY, body TEXT NOT NULL);`);
+      CREATE TABLE IF NOT EXISTS handoffs (id TEXT PRIMARY KEY, body TEXT NOT NULL);
+      CREATE TABLE IF NOT EXISTS epay_orders (reference TEXT PRIMARY KEY, state TEXT NOT NULL,
+        next_attempt INTEGER NOT NULL, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS epay_due ON epay_orders(state, next_attempt);`);
   }
   secret(name) {
     const file = path.join(this.dir, name + '.secret');
@@ -71,6 +74,23 @@ class Store {
   saveJob(j) { this.db.prepare('INSERT INTO jobs VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,body=excluded.body').run(j.id, j.state, JSON.stringify(j)); }
   handoff(id) { const r = this.db.prepare('SELECT body FROM handoffs WHERE id=?').get(id); return r ? JSON.parse(r.body) : null; }
   saveHandoff(h) { this.db.prepare('INSERT INTO handoffs VALUES (?,?) ON CONFLICT(id) DO UPDATE SET body=excluded.body').run(h.id, JSON.stringify(h)); }
+  epayReference(reference) {
+    const row = this.db.prepare('SELECT body FROM epay_orders WHERE reference=?').get(reference);
+    return row ? JSON.parse(row.body) : null;
+  }
+  saveEpay(q) {
+    this.db.prepare(`INSERT INTO epay_orders VALUES (?,?,?,?) ON CONFLICT(reference) DO UPDATE
+      SET state=excluded.state,next_attempt=excluded.next_attempt,body=excluded.body`)
+      .run(q.reference, q.state, q.nextAttempt, JSON.stringify(q));
+  }
+  dueEpay(now) {
+    return this.db.prepare("SELECT body FROM epay_orders WHERE state='PENDING' AND next_attempt<=? ORDER BY next_attempt,rowid LIMIT 25")
+      .all(now).map(r => JSON.parse(r.body));
+  }
+  epayReconcile() {
+    return this.db.prepare("SELECT body FROM epay_orders WHERE state='RECONCILE' ORDER BY rowid DESC LIMIT 100")
+      .all().map(r => JSON.parse(r.body));
+  }
   notifications() { return this.db.prepare('SELECT body FROM notifications ORDER BY rowid').all().map(r => JSON.parse(r.body)); }
   notify(n) { this.db.prepare('INSERT INTO notifications VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,body=excluded.body').run(n.id, n.state, JSON.stringify(n)); }
   close() {

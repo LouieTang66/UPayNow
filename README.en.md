@@ -67,6 +67,10 @@ Create order → Pay → Confirm on-chain → Notify store → Fulfill order
 
 Payment confirmation and fund collection are independent. The store can process confirmed orders without waiting for collection to finish.
 
+## EPay compatibility
+
+UPayNow offers an opt-in EPay-compatible entry point for USDT checkout while retaining one address per order. Prices must already be denominated in USDT; the adapter does not convert currencies. The current target is the New API top-up flow in legacy MD5 mode; this does not add Alipay, WeChat Pay, or universal EPay compatibility. See the [EPay setup guide](docs/EPAY.md).
+
 ## Quick start
 
 ### 1. Install and start
