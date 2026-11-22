@@ -48,6 +48,7 @@ class WalletCollection {
       const plan = body.mode === 'paid' ? await this.merchant.paidPlan(body.orderIds) : null;
       const ids = plan ? plan.entries.map(o => o.id) : body.orderIds;
       const result = plan ? { ...plan, skipped: body.orderIds.length - ids.length } : {};
+      requireValue(ids.length || !plan?.heldCount, 'TRANSACTION_RECONCILIATION_REQUIRED', 409);
       if (!ids.length) return { ...result, job: null, summary: null };
       this.assertAvailable(ids);
       requireValue(await chain.provider.getBalance(from) > 0n, 'CONNECTED_WALLET_NEEDS_GAS', 409);

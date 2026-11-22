@@ -34,12 +34,12 @@ export async function desktopFlow(app, d, { kind, deploymentId, intent, deployme
     if (isDeploy) assertDeploymentSender(deploymentJob, expected.address);
     if (recovery) assertRecoveryContext(app, recovery);
     if (d.closed) { release(); return; }
-    let job = deploymentJob, summary;
+    let job = deploymentJob, summary, held = false;
     if (!isDeploy) {
       const prepared = recovery
         ? await app.client.post('crosschain-recovery/prepare', { ...recovery.request, from: expected.address })
         : await app.client.post('wallet/prepare', { ...intent, from: expected.address }, scope);
-      job = prepared.job; summary = prepared.summary;
+      job = prepared.job; summary = prepared.summary; held = prepared.heldCount > 0;
       if (recovery && job) validateRecoveryJob(job, recovery, prepared.deploymentId);
       if (!job) { d.setBody(notice('info', '没有可归集余额，没有发送交易。')); release(); return; }
       if (!summary || Number(summary.chainId) !== expected.chainId || summary.from?.toLowerCase() !== expected.address.toLowerCase()
@@ -61,7 +61,8 @@ export async function desktopFlow(app, d, { kind, deploymentId, intent, deployme
     d.setBody(kv([['网络', `${metadata(config).name} · Chain ${expected.chainId} · gas ${metadata(config).symbol}`],
       ['发送钱包', copyable(expected.address)], ['固定收款钱包', copyable(config.payout)],
       ...(!isDeploy ? [['Factory', copyable(config.factory)], ['订单数', String(job.orderIds?.length || 1)]] : [['支持币种', (config.tokens || []).map(t => `${t.symbol || ''} ${t.address || t}`).join('、')], ...(deterministic(job) ? [['阶段', bootstrap(job) ? '准备同地址部署入口（不会注册商户部署）' : '部署商户合约'], ['预期 Factory', copyable(config.predictedFactory)], ['签名限制', '必须使用固定收款 payout 钱包；不能签名的地址不支持']] : [])]),
-      ['记录 ID', copyable(job.id)]]), notice('warn', '关闭页面或断网不会取消已签名交易', '后台会先持久记录 UNKNOWN，再交给钱包；任何不确定结果都只能恢复原交易，不能自动重发。'));
+      ['记录 ID', copyable(job.id)]]), held ? notice('unknown', '部分订单仍在等原交易核对', '本次仅列出未锁定的订单。') : null,
+    notice('warn', '关闭页面或断网不会取消已签名交易', '后台会先持久记录 UNKNOWN，再交给钱包；任何不确定结果都只能恢复原交易，不能自动重发。'));
     let clicked = false;
     d.setFoot(h('button', { class: 'btn', onclick: async () => {
       if (clicked) return; clicked = true;

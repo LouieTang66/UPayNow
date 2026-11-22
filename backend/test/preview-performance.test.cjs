@@ -11,7 +11,7 @@ function deferred() {
   return { promise, resolve, reject };
 }
 function orders(count) {
-  return Array.from({ length: count }, (_, i) => ({ id: 'order-' + i, reference: 'fixture-' + i,
+  return Array.from({ length: count }, (_, i) => ({ id: 'order-' + i, orderHash: 'hash-' + i, reference: 'fixture-' + i,
     address: 'address-' + i, token: 'TOKEN', symbol: 'TEST', decimals: 6,
     expectedUnits: '1000000', confirmedUnits: '1000000', expectedAmount: '1.0',
     paid: true, status: 'PAID', expiresAt: Date.now() + 60000, generation: 1, stateVersion: 0 }));
@@ -175,12 +175,13 @@ test('controlled 10-order balance-read benchmark keeps the same result with boun
     serialMs: serial.ms, parallelMs: parallel.ms, peakConcurrentReads: parallel.peak }));
 });
 
-test('preview still rejects unresolved transactions, identity mismatch and a noncanonical anchor', async () => {
-  const f = fixture(orders(1)); f.jobs.push({ state: 'UNKNOWN' });
-  await assert.rejects(f.merchant.previewPaid(), { code: 'TRANSACTION_RECONCILIATION_REQUIRED' });
+test('preview omits held orders with a distinct count and still rejects identity mismatch and a noncanonical anchor', async () => {
+  const f = fixture(orders(1)); f.jobs.push({ id: 'held', state: 'UNKNOWN', orderIds: ['order-0'] });
+  const held = await f.merchant.previewPaid();
+  assert.deepEqual(held.entries, []); assert.equal(held.heldCount, 1);
   f.jobs.length = 0;
   const identity = f.chain.identity;
-  f.chain.identity = async () => { await identity(); if (f.calls.identity === 3) throw new AppError('FACTORY_IDENTITY_MISMATCH', 409); };
+  f.chain.identity = async () => { await identity(); if (f.calls.identity === 4) throw new AppError('FACTORY_IDENTITY_MISMATCH', 409); };
   await assert.rejects(f.merchant.previewPaid(), { code: 'FACTORY_IDENTITY_MISMATCH' });
   f.chain.identity = identity; f.chain.block = async number => ({ number, hash: 'not-the-anchor' });
   await assert.rejects(f.merchant.paidPlan(undefined, true), { code: 'SCAN_REORG_RETRY' });

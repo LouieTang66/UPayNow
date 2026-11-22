@@ -124,23 +124,25 @@ test('audit fixes: isolated HTTPS EVM, durable recovery and HTTP boundaries', { 
       } finally { await provider.send('evm_setAutomine', [true]); await f.close(); }
     });
 
-    await t.test('manual acknowledgement cannot invent success, known candidate cannot be abandoned, old hash cannot be reused', async () => {
+    await t.test('manual acknowledgement cannot invent chain success, preserves audit and cannot reuse the old hash', async () => {
       const f = await fixture();
       try {
         const p = await f.prepare(), begun = await f.action(p.job, 'begin');
         await f.action(p.job, 'resolve', { acknowledge: true }, 400);
         const abandoned = await f.action(p.job, 'resolve', { acknowledge: true, note: '已核对钱包，保留未知风险记录' });
         assert.equal(abandoned.state, 'ABANDONED'); assert.equal(abandoned.outcome, undefined);
-        assert.equal(abandoned.history.at(-1).type, 'ADMIN_ABANDONED_UNRESOLVED');
+        assert.equal(abandoned.history.at(-1).type, 'ADMIN_MANUAL_RESOLUTION');
+        assert.equal(abandoned.manualResolution.verifiedOnChain, false);
         const sent = await send(begun.transaction); await f.api('scan', {});
-        assert.equal(f.app.store.job(p.job.id).state, 'MINED');
+        assert.equal(f.app.store.job(p.job.id).state, 'ABANDONED');
         const second = await f.api('wallet/prepare', { mode: 'manual', from, orderIds: [f.order.id] }, 201);
         await f.action(second.job, 'begin');
         await f.api('jobs/' + second.job.id + '/reconcile', { transactionHash: sent.hash }, 400);
         const absent = ethers.id('unseen-' + second.job.id);
         await f.action(second.job, 'attach', { transactionHash: absent });
-        await f.action(second.job, 'resolve', { acknowledge: true, note: '不能丢弃已登记的候选交易' }, 409);
-        assert.equal(f.app.store.job(second.job.id).state, 'UNKNOWN');
+        const resolved = await f.action(second.job, 'resolve', { acknowledge: true, note: '保留已登记的候选交易供人工核对' });
+        assert.equal(resolved.state, 'ABANDONED');
+        assert.equal(resolved.manualResolution.verifiedOnChain, false);
         assert.equal(f.app.store.job(second.job.id).candidateHash, absent);
       } finally { await f.close(); }
     });

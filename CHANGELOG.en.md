@@ -8,6 +8,11 @@
 
 - Add an opt-in EPay-compatible entry point, initially targeting the legacy MD5 top-up flow in New API. Existing on-chain payment matching, per-order addresses, and the native API remain unchanged. Orders must already be priced in USDT; there is no currency conversion.
 
+### Fixes
+
+- The backend continues to check the chain when a collection outcome is unknown and never resends automatically. Desktop and mobile distinguish orders awaiting verification from orders with no balance and allow unrelated orders to be collected.
+- EPay stops sending callbacks at the attempt limit. If the final delivery outcome is unknown, the order moves to reconciliation. Admins can filter and page through orders, copy the merchant reference, and record their findings without changing funds or delivery state.
+
 ### Documentation
 
 - Refresh the product README to describe source availability, self-hosted, non-custodial payments, one address per order, and supported networks.

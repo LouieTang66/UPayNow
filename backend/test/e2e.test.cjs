@@ -49,6 +49,7 @@ test('merchant backend with real local EVM, HTTP and isolated durable storage', 
       assert.equal(Number(BigInt(chainId)), 31337);
       const sent = await signer.sendTransaction({ ...transaction, gasLimit: gas });
       await sent.wait();
+      await provider.send('evm_mine', []); // configured depth is two for collection as well as deposits
       const job = await api('wallet/jobs/' + prepared.job.id + '/attach', { transactionHash: sent.hash });
       assert.equal(job.state, 'MINED');
       return mode === 'paid' ? { ...prepared, job } : job;
@@ -243,7 +244,9 @@ test('merchant backend with real local EVM, HTTP and isolated durable storage', 
       const unrelated = (await api('jobs')).find(j => j.state === 'MINED');
       app.store.saveJob(unknown);
       assert.equal((await externalCollect('manual', { orderIds: [main.id] }, 409)).error, 'TRANSACTION_RECONCILIATION_REQUIRED');
-      assert.equal((await api('collect-all/preview', {}, 409)).error, 'TRANSACTION_RECONCILIATION_REQUIRED');
+      const preview = await api('collect-all/preview', {});
+      assert.equal(preview.heldCount, 1);
+      assert(!preview.entries.some(o => o.id === main.id));
       assert.equal((await externalCollect('paid', { orderIds: [main.id] }, 409)).error, 'TRANSACTION_RECONCILIATION_REQUIRED');
       assert.equal((await api('jobs/' + unknown.id + '/reconcile', { transactionHash: unrelated.txHash }, 400)).error, 'TRANSACTION_DOES_NOT_MATCH_JOB');
       assert.equal(app.store.job(unknown.id).state, 'UNKNOWN');

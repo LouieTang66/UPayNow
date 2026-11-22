@@ -3,6 +3,7 @@
 import adminPages from './locales/admin-pages.en.json';
 import shared from './locales/admin-shared.en.json';
 import publicPages from './locales/public.en.json';
+import epayOperations from './locales/epay-operations.en.json';
 
 export const LANGUAGE_KEY = 'upay.language';
 const extras = {
@@ -19,7 +20,7 @@ const extras = {
   'BSC Testnet（测试网）{0}': 'BSC Testnet (Testnet){0}',
   'Ethereum Sepolia（测试网）{0}': 'Ethereum Sepolia (Testnet){0}',
 };
-const messages = new Map(Object.entries({ ...adminPages, ...shared, ...publicPages, ...extras }));
+const messages = new Map(Object.entries({ ...epayOperations, ...adminPages, ...shared, ...publicPages, ...extras }));
 const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const recursiveSlots = new Map([
   ['复制 {0}', [0]], ['已同步 · {0}', [0]], ['{0}前', [0]], ['{0}后', [0]], ['更新于 {0}', [0]],

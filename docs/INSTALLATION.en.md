@@ -65,7 +65,7 @@ Payment and collection have separate states. The store verifies signatures, dedu
 
 ## 6. Stop, Back Up, and Recover
 
-Stop gracefully through the process manager or send SIGTERM/SIGINT. Never run two instances against the same state directory. An abnormal exit may leave `owner.lock`; verify that the associated process has stopped before the deployer handles the stale lock. Do not remove a running instance's lock.
+Stop gracefully through the process manager or send SIGTERM/SIGINT. Run only one writer per state directory. Automatic recovery requires a supported Linux local filesystem and proof that the old writer has exited. Have the operator investigate legacy locks, unrecognized locks, and locks left across a host reboot. Do not delete a lock and restart blindly. See [Operating UPayNow](OPS.en.md).
 
 The deployer is responsible for backups, monitoring, updates, certificate renewal, and recovery drills. Back up the **entire state root and every deployment subdirectory**, including configuration, keys, orders, notifications, and unknown tasks. Use a consistent SQLite backup mechanism, or stop the service gracefully before copying the entire state. Hot-copying only `merchant.sqlite` does not ensure that WAL data is preserved. Backups contain sensitive credentials; encrypt them and restrict access.
 

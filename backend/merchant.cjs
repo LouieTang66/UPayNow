@@ -147,7 +147,7 @@ class Merchant {
           chainId: o.chainId, factory: o.factory, orderAddress: o.address, token: o.token,
           expectedUnits: o.expectedUnits, confirmedUnits: o.confirmedUnits, status: o.status,
           latePaymentAccepted: !!o.latePaymentAcceptance };
-        this.store.notify({ id, orderId: o.id, url: o.webhookUrl, payload, state: 'PENDING', attempts: 0, nextAttempt: 0 });
+        this.store.notify({ id, orderId: o.id, url: o.webhookUrl, payload, state: 'PENDING', attempts: 0, nextAttempt: 0, queuedAt: Date.now() });
       }
     }
   }
@@ -282,9 +282,11 @@ class Merchant {
     await chain.identity();
     const anchor = this.store.anchors()[0];
     requireValue(anchor && (await chain.block(anchor.number))?.hash === anchor.hash, 'SCAN_REORG_RETRY', 409);
-    const orders = this.store.orders().filter(o => (!orderIds || orderIds.includes(o.id))
-      && !locked.has(o.id) && !locked.has(o.orderHash.toLowerCase())
-      && o.paid && BigInt(o.confirmedUnits) >= BigInt(o.expectedUnits));
+    const requested = orderIds && new Set(orderIds);
+    const scoped = this.store.orders().filter(o => !requested || requested.has(o.id));
+    const isHeld = o => locked.has(o.id) || locked.has(o.orderHash?.toLowerCase());
+    const heldCount = scoped.filter(o => isHeld(o) && (requested || o.paid)).length;
+    const orders = scoped.filter(o => !isHeld(o) && o.paid && BigInt(o.confirmedUnits) >= BigInt(o.expectedUnits));
     const entries = [], width = parallel ? 4 : 1;
     for (let i = 0; i < orders.length; i += width) {
       const results = await Promise.allSettled(orders.slice(i, i + width).map(async o => {
@@ -298,7 +300,7 @@ class Merchant {
       if (failed) throw failed.reason;
       entries.push(...results.map(r => r.value).filter(Boolean));
     }
-    return { policy: 'CONFIRMED_PAID', chainId: chain.config.chainId, payout: chain.config.payout, entries };
+    return { policy: 'CONFIRMED_PAID', chainId: chain.config.chainId, payout: chain.config.payout, entries, heldCount };
   }
   // Retained method names reject old clients; only wallet prepare/begin/attach can submit intent.
   async collectPaid() { throw new AppError('CONNECTED_WALLET_REQUIRED', 409); }
@@ -358,6 +360,7 @@ class Merchant {
   }
   async refreshJobs() {
     let recoveryBindingsVerified = false;
+    let observedHead;
     await this.observeExternalTransactions();
     for (const job of this.store.jobs()) {
       if (job.manualResolution) continue;
@@ -374,7 +377,9 @@ class Merchant {
       }
       if (job.state === 'REPLACED' && job.replacementHash) {
         const replacement = await this.chain.provider.getTransactionReceipt(job.replacementHash);
-        if (!replacement || (await this.chain.block(replacement.blockNumber))?.hash !== replacement.blockHash) {
+        if (replacement) observedHead ??= await this.chain.head();
+        if (!replacement || (await this.chain.block(replacement.blockNumber))?.hash !== replacement.blockHash
+          || observedHead - replacement.blockNumber + 1 < this.chain.config.confirmations) {
           job.state = 'UNKNOWN'; job.error = 'REPLACEMENT_REORGED'; delete job.replacementHash; this.store.saveJob(job);
         } else continue;
       }
@@ -382,18 +387,40 @@ class Merchant {
       const receipt = await this.chain.provider.getTransactionReceipt(job.txHash);
       if (this.store.job(job.id)?.manualResolution) continue;
       if (!receipt) {
-        if (job.state === 'MINED') { job.state = 'UNKNOWN'; job.error = 'RECEIPT_REORGED'; this.store.saveJob(job); }
+        if (job.state === 'MINED') { job.state = 'UNKNOWN'; job.outcome = null; job.error = 'RECEIPT_REORGED'; this.store.saveJob(job); }
         continue;
       }
-      requireValue((await this.chain.block(receipt.blockNumber))?.hash === receipt.blockHash, 'RECEIPT_NOT_CANONICAL', 409);
-      if (job.recoveryOnly) requireValue(receipt.hash.toLowerCase() === job.txHash.toLowerCase()
-        && receipt.from === job.from && receipt.to === job.factory && receipt.blockNumber > job.dispatchBlock, 'RECOVERY_RECEIPT_MISMATCH', 409);
-      if (job.recoveryOnly && await this.chain.head() - receipt.blockNumber + 1 < this.chain.config.confirmations) {
-        if (job.state === 'MINED') {
-          job.state = 'SUBMITTED'; job.outcome = null; job.error = 'CONFIRMATIONS_REORGED'; this.store.saveJob(job);
+      const canonical = await this.chain.block(receipt.blockNumber);
+      if (canonical?.hash !== receipt.blockHash) {
+        job.state = 'UNKNOWN'; job.outcome = null; job.error = 'RECEIPT_REORGED'; this.store.saveJob(job);
+        continue;
+      }
+      observedHead ??= await this.chain.head();
+      if (observedHead - receipt.blockNumber + 1 < this.chain.config.confirmations) {
+        const nextError = job.state === 'MINED' || job.error === 'CONFIRMATIONS_REORGED' ? 'CONFIRMATIONS_REORGED' : 'AWAITING_COLLECTION_CONFIRMATIONS';
+        if (job.state !== 'SUBMITTED' || job.error !== nextError) {
+          job.state = 'SUBMITTED'; job.outcome = null; job.error = nextError; this.store.saveJob(job);
         }
         continue;
       }
+      // A receipt is not evidence for this job merely because it exists. Match the
+      // canonical hash, sender, Factory, calldata, value and chain before settling.
+      if (receipt.hash?.toLowerCase() !== job.txHash.toLowerCase() || receipt.from !== job.from
+        || receipt.to !== (job.factory || this.chain.config.factory) || receipt.status !== 0 && receipt.status !== 1) continue;
+      const verified = job.receiptVerification;
+      if (job.state === 'MINED' && verified?.txHash === receipt.hash && verified.blockHash === receipt.blockHash
+        && verified.status === receipt.status) continue;
+      const tx = await this.chain.provider.getTransaction(job.txHash);
+      if (!this.matchesTransaction(job, tx) || tx.blockHash !== receipt.blockHash || tx.blockNumber !== receipt.blockNumber) continue;
+      const events = this.chain.parse(receipt);
+      const successEvent = job.wrongToken !== null && job.wrongToken !== undefined ? 'WrongTokenCollected' : 'Collected';
+      const outcomes = (job.pairs || []).map(pair => events.filter(e => e.orderHash?.toLowerCase() === pair.orderIdHash.toLowerCase()
+        && e.token?.toLowerCase() === pair.token.toLowerCase()
+        && (e.name === 'CollectFailed' || e.name === successEvent && BigInt(e.amount ?? 0) > 0n)));
+      // The immutable Factory deliberately emits no result for a zero-amount
+      // sweep. For a verified canonical call, this is a no-op, not a transfer.
+      const handled = outcomes.flat();
+      if (receipt.status === 1 && outcomes.some(matches => matches.length > 1)) continue;
       // Handle orphaned receipts before inspecting code: a deep reorg may have
       // removed the Factory too. Unchanged final receipts need no full ABI and
       // metadata inspection on every poll; these contracts cannot change code.
@@ -402,9 +429,14 @@ class Merchant {
         recoveryBindingsVerified = true;
       }
       job.state = 'MINED'; job.blockNumber = receipt.blockNumber; job.blockHash = receipt.blockHash;
-      job.events = this.chain.parse(receipt);
-      job.outcome = receipt.status === 0 ? 'REVERTED'
-        : job.events.some(e => e.name === 'CollectFailed') ? 'PARTIAL_FAILURE' : 'SUCCESS';
+      job.receiptVerification = { txHash: receipt.hash, blockHash: receipt.blockHash, status: receipt.status };
+      job.events = events; job.error = null;
+      // Older completed jobs may lack pair metadata. Preserve their previous
+      // interpretation; a new job always records pairs before dispatch.
+      const recorded = outcomes.length ? handled : events;
+      job.outcome = receipt.status === 0 ? 'REVERTED' : recorded.some(e => e.name === 'CollectFailed') ? 'PARTIAL_FAILURE'
+        : !recorded.some(e => e.name === successEvent) ? 'NO_BALANCE'
+          : outcomes.some(matches => matches.length === 0) ? 'PARTIAL_SUCCESS' : 'SUCCESS';
       this.store.saveJob(job);
     }
   }

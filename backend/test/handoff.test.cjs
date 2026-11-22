@@ -40,11 +40,11 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
       if (code) assert.equal(reply.body.error, code);
       return reply.body;
     }
-    async function fixture() {
+    async function fixture(confirmations = 1) {
       const f = { dir: fs.mkdtempSync(path.join(os.tmpdir(), 'upaynow-handoff-')), app: null };
       fixtures.add(f);
-      f.open = async () => {
-        f.app = await start({ dir: f.dir, port: 0, handoffPort: 0, pollMs: 0, externalWallet: true,
+      f.open = async (pollMs = 0) => {
+        f.app = await start({ dir: f.dir, port: 0, handoffPort: 0, pollMs, externalWallet: true,
           privateKey: 'DO_NOT_PARSE_OR_USE_A_BACKEND_KEY' });
         assert.notEqual(new URL(f.app.url).port, '8797');
         assert.notEqual(f.app.url, f.app.handoff.origin);
@@ -55,7 +55,7 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
       f.admin = async (route, body, status = 200) => expect(await request(f.app.url, '/api/' + route, body,
         { Authorization: 'Bearer ' + f.secret }), status);
       await f.admin('config', { rpcUrl: local.url, chainId: 31337, factory: deployed.factory.target,
-        payout: deployed.payout, startBlock: 0, confirmations: 1 });
+        payout: deployed.payout, startBlock: 0, confirmations });
       f.app.merchant.chain.signer = () => { throw Error('BACKEND_SIGNER_FORBIDDEN'); };
       f.order = (token = deployed.a, amount = '1') => f.admin('orders', {
         reference: 'HANDOFF-' + (++serial), token: token.target, amount, expiresInSeconds: 86400
@@ -72,7 +72,7 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
       f.expire = ticket => {
         const record = f.app.store.handoff(ticket.id); record.expiresAt = Date.now() - 1; f.app.store.saveHandoff(record);
       };
-      f.restart = async () => { await f.app.close(); f.app = null; await f.open(); };
+      f.restart = async pollMs => { await f.app.close(); f.app = null; await f.open(pollMs); };
       f.close = async () => {
         if (f.app) await f.app.close(); f.app = null;
         fs.rmSync(f.dir, { recursive: true, force: true }); fixtures.delete(f);
@@ -227,7 +227,7 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
       } finally { await f.close(); }
     });
 
-    await t.test('revoked READY/PREPARED cannot begin; PREPARED revoke cancels and releases global lock', async () => {
+    await t.test('revoked READY/PREPARED cannot begin; PREPARED revoke cancels and releases the affected order lock', async () => {
       const f = await fixture();
       try {
         const order = await funded(f), ready = await f.ticket([order]);
@@ -282,15 +282,17 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
       } finally { await f.close(); }
     });
 
-    await t.test('concurrent prepare creates exactly one bound job; PREPARED and UNKNOWN persist restart', async () => {
+    for (const mode of ['paid', 'manual']) await t.test('concurrent ' + mode + ' prepare reuses one bound job; PREPARED and UNKNOWN persist restart', async () => {
       const f = await fixture();
       try {
-        const ticket = await f.ticket([await funded(f)]);
-        const replies = await Promise.all([f.phone(ticket, 'prepare', { from }), f.phone(ticket, 'prepare', { from })]);
-        assert.ok(replies.some(r => r.status === 200));
-        for (const reply of replies) assert.ok([200, 409].includes(reply.status), JSON.stringify(reply));
-        const prepared = replies.find(r => r.status === 200).body;
-        for (const reply of replies.filter(r => r.status === 200)) assert.equal(reply.body.job.id, prepared.job.id);
+        const ticket = await f.ticket([await funded(f)], mode);
+        const [first, second] = await Promise.all([f.phone(ticket, 'prepare', { from }), f.phone(ticket, 'prepare', { from })]);
+        const prepared = expect(first), duplicate = expect(second);
+        assert.ok(prepared.job?.id);
+        assert.deepEqual(duplicate, prepared);
+        assert.equal(f.app.store.handoff(ticket.id).state, 'READY');
+        assert.equal(expect(await f.phone(ticket)).job.id, prepared.job.id);
+        expect(await f.phone(ticket, 'prepare', { from: await customer.getAddress() }), 409, 'HANDOFF_USED');
         assert.equal(f.app.store.jobs().length, 1);
         await f.restart();
         assert.equal(f.app.store.handoff(ticket.id).jobId, prepared.job.id);
@@ -302,6 +304,93 @@ test('handoff: isolated real local EVM, two HTTP listeners and durable SQLite', 
         assert.equal(f.app.store.jobs().length, 1);
         await complete(f, ticket, begun.transaction);
       } finally { await f.close(); }
+    });
+
+    await t.test('paid ticket emptied by a completed separate collection records no new job', async () => {
+      const f = await fixture();
+      try {
+        const order = await funded(f), ticket = await f.ticket([order]);
+        const { job } = await f.admin('wallet/prepare', { mode: 'paid', orderIds: [order.id], from }, 201);
+        const { transaction } = await f.admin('wallet/jobs/' + job.id + '/begin', {});
+        const { sent } = await broadcast(transaction);
+        assert.equal((await f.admin('wallet/jobs/' + job.id + '/attach', { transactionHash: sent.hash })).state, 'MINED');
+        const empty = expect(await f.phone(ticket, 'prepare', { from }));
+        assert.deepEqual(empty, { job: null, summary: null });
+        assert.equal(expect(await f.phone(ticket)).state, 'EMPTY');
+        assert.equal(f.app.store.handoff(ticket.id).jobId, null);
+        assert.equal(f.app.store.jobs().length, 1);
+        expect(await f.phone(ticket, 'prepare', { from }), 409, 'HANDOFF_USED');
+      } finally { await f.close(); }
+    });
+
+    await t.test('UNKNOWN holds only its orders; mobile accepts unrelated orders and a canonical empty sweep is not a transfer', async () => {
+      const f = await fixture();
+      try {
+        const a = await funded(f), b = await funded(f);
+        const ticket = await f.ticket([a]); await f.prepare(ticket);
+        const begun = await f.begin(ticket);
+        assert.equal(begun.job.state, 'UNKNOWN');
+        const request = order => ({ mode: 'paid', orderIds: [order.id] });
+        const preview = await f.admin('collect-all/preview', {});
+        assert.equal(preview.heldCount, 1);
+        assert.deepEqual(preview.entries.map(o => o.id), [b.id]);
+        assert.equal((await f.admin('wallet/prepare', { ...request(a), from }, 409)).error, 'TRANSACTION_RECONCILIATION_REQUIRED');
+        assert.equal((await f.admin('handoffs', request(a), 409)).error, 'TRANSACTION_RECONCILIATION_REQUIRED');
+        const unrelated = await f.ticket([b]);
+        assert.equal((await f.prepare(unrelated)).job.state, 'PREPARED');
+        await f.admin('scan', {}); // no matching transaction, no reason to unlock
+        assert.equal(f.app.store.job(begun.job.id).state, 'UNKNOWN');
+
+        const independent = await provider.getSigner(4);
+        await (await deployed.factory.connect(independent).collect(a.orderHash, a.token)).wait();
+        const { sent } = await broadcast(begun.transaction); // the original request now has a zero-balance canonical receipt
+        await f.restart(25);
+        // Reopening/reconnecting reads status, without a scan button, registration or new wallet action.
+        let result;
+        for (let i = 0; i < 60; i++) {
+          result = expect(await f.phone(ticket)).job;
+          if (result?.state === 'MINED') break;
+          await new Promise(resolve => setTimeout(resolve, 25));
+        }
+        assert.equal(result.txHash, sent.hash);
+        assert.equal(result.state, 'MINED');
+        assert.equal(result.outcome, 'NO_BALANCE');
+        assert.equal(f.app.merchant.collectionLocks().has(a.id), false);
+        assert.equal(f.app.merchant.collectionLocks().has(b.id), true);
+        const rpc = f.app.merchant.chain.provider;
+        const original = rpc.getTransaction.bind(rpc);
+        let repeatedReads = 0;
+        rpc.getTransaction = hash => { if (hash === sent.hash) repeatedReads++; return original(hash); };
+        await f.app.merchant.scan();
+        assert.equal(repeatedReads, 0, 'unchanged canonical receipt must not repeat the transaction identity lookup');
+      } finally { await f.close(); }
+    });
+
+    await t.test('an actual reverted wallet transaction stays held until the configured confirmation depth', async () => {
+      const f = await fixture(2);
+      try {
+        const order = await funded(f);
+        await provider.send('evm_mine', []);
+        const ticket = await f.ticket([order]);
+        await f.prepare(ticket);
+        const { job, transaction: { gas, ...request } } = await f.begin(ticket);
+        await provider.send('evm_setAutomine', [false]);
+        // The test wallet submits the intended transaction, but uses insufficient gas.
+        const sent = await signer.sendTransaction({ ...request, gasLimit: 28_000 });
+        await provider.send('evm_mine', []);
+        assert.equal((await provider.getTransactionReceipt(sent.hash)).status, 0);
+        await provider.send('evm_setAutomine', [true]);
+        await f.admin('scan', {});
+        assert.equal(f.app.store.job(job.id).state, 'SUBMITTED');
+        assert.equal(f.app.merchant.collectionLocks().has(order.id), true);
+        await provider.send('evm_mine', []);
+        await f.admin('scan', {});
+        assert.equal(f.app.store.job(job.id).outcome, 'REVERTED');
+        assert.equal(f.app.merchant.collectionLocks().has(order.id), false);
+        assert.equal(await deployed.a.balanceOf(order.address), ethers.parseUnits('1', 6));
+        const next = await f.ticket([order]);
+        assert.equal((await f.prepare(next)).job.state, 'PREPARED');
+      } finally { await provider.send('evm_setAutomine', [true]); await f.close(); }
     });
 
     await t.test('manual retry resumes one UNKNOWN/rejected job, keeps original checkpoint and rejects stale rejection', async () => {

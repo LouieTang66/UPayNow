@@ -534,5 +534,9 @@
   "订单已创建。": "Order created.",
   "创建订单": "Create Order",
   "清空": "Clear",
-  "将创建在部署“{0}”下。切换部署后这份草稿会被丢弃，不会带到其他链。": "Will be created under deployment “{0}”. Switching deployments discards this draft; it will not carry over to another chain."
+  "将创建在部署“{0}”下。切换部署后这份草稿会被丢弃，不会带到其他链。": "Will be created under deployment “{0}”. Switching deployments discards this draft; it will not carry over to another chain.",
+  "所选订单仍在等原交易核对": "Selected orders are still held for reconciliation",
+  "这些订单暂未解锁。请到异常恢复查看，勿重复发起。": "These orders remain locked. Check Recovery and do not submit again.",
+  "部分订单仍在等原交易核对": "Some orders are still held for reconciliation",
+  "本次仅列出未锁定的订单。": "Only unlocked orders are listed here."
 }

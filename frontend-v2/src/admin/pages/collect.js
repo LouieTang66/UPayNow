@@ -43,8 +43,11 @@ function readyTab(app) {
         :
       !preview ? h('div', { class: 'card-body muted' }, '点击“核对可归集订单”后，后台会先同步链上记录，再逐笔读取订单地址的实时余额。这一步不发送交易。')
         : preview.error ? h('div', { class: 'card-body' }, notice('warn', '暂时不能核对', errorMessage(preview.error)))
-        : !preview.value.entries.length ? emptyState('没有可归集的订单', '已付足订单的余额都已归集，或尚未达到确认数。')
+        : !preview.value.entries.length ? preview.value.heldCount
+          ? emptyState('所选订单仍在等原交易核对', '这些订单暂未解锁。请到异常恢复查看，勿重复发起。')
+          : emptyState('没有可归集的订单', '已付足订单的余额都已归集，或尚未达到确认数。')
         : h('div', null,
+          preview.value.heldCount ? h('div', { class: 'card-body' }, notice('unknown', '部分订单仍在等原交易核对', '本次仅列出未锁定的订单。')) : null,
           stale ? h('div', { class: 'card-body' }, notice('warn', '核对结果已超过 2 分钟', '余额可能已变化，请重新核对后再发起。')) : null,
           h('div', { class: 'table-wrap' }, h('table', { class: 'table responsive' },
             h('thead', null, h('tr', null, h('th', null, '商户订单号'), h('th', { class: 'num' }, '应付'), h('th', { class: 'num' }, '当前余额（将全部归集）'))),

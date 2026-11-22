@@ -54,7 +54,12 @@ test('quick handoff: real isolated batch receipt closes tunnel; UNKNOWN survives
     await call(ticket, 'prepare', { from });
     const begun = await call(ticket, 'begin', {});
     const hash = await send(begun.transaction);
-    const completed = await call(ticket, 'attach', { transactionHash: hash });
+    const confirming = await call(ticket, 'attach', { transactionHash: hash });
+    assert.equal(confirming.state, 'SUBMITTED');
+    assert.equal(confirming.error, 'AWAITING_COLLECTION_CONFIRMATIONS');
+    await provider.send('evm_mine', []);
+    await admin('scan', {});
+    const completed = await admin('jobs').then(jobs => jobs.find(j => j.id === begun.job.id));
     assert.equal(completed.state, 'MINED'); assert.equal(completed.outcome, 'SUCCESS');
     await new Promise((resolve, reject) => {
       const timeout = setTimeout(() => reject(Error('TUNNEL_DID_NOT_CLOSE_AFTER_RECEIPT')), 3000);
@@ -75,6 +80,7 @@ test('quick handoff: real isolated batch receipt closes tunnel; UNKNOWN survives
     assert.equal(app.handoff.tunnel.status().reason, 'TIMEOUT');
     assert.equal(app.store.job(pending.job.id).state, 'UNKNOWN'); assert.equal(await signer.getNonce('pending'), before);
     const lateHash = await send(pending.transaction);
+    await provider.send('evm_mine', []);
     const recovered = await admin('jobs/' + pending.job.id + '/reconcile', { transactionHash: lateHash });
     assert.equal(recovered.state, 'MINED'); assert.equal(recovered.outcome, 'SUCCESS');
     assert.equal(app.handoff.tunnel.status().state, 'CLOSED'); assert.equal(await signer.getNonce('pending'), before + 1);

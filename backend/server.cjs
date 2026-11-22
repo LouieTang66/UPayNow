@@ -4,10 +4,12 @@ const path = require('node:path');
 const QRCode = require('qrcode');
 const { serveFrontend } = require('./frontend.cjs');
 const { createEngine } = require('./engine.cjs');
+const { createOpsMonitor } = require('./ops-monitor.cjs');
 const { publicJob } = require('./job-view.cjs');
 const { AppError, requireValue } = require('./chain.cjs');
 const { Auth } = require('./auth.cjs');
 const { Epay, environment: epayEnvironment, submissionForm } = require('./epay.cjs');
+const epayOperations = require('./epay-operations.cjs');
 async function start(options = {}) {
   const dir = path.resolve(options.dir || process.env.UPAY_DATA_DIR || path.join(__dirname, 'state'));
   requireValue(options.localTestNoLogin !== true, 'NO_LOGIN_MODE_REMOVED');
@@ -52,6 +54,11 @@ async function start(options = {}) {
     }
   } catch (error) { clearInterval(deploymentTimer); await deploymentHandoff?.close(); await deployments?.close(); await root.close(); throw error; }
 
+  const ops = createOpsMonitor({
+    engines: () => deployments ? deployments.entries : [['legacy', root]],
+    epay: () => epay,
+    emit: options.opsEmit,
+  });
   const send = (response, code, body, headers = {}) => {
     response.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers });
     response.end(typeof body === 'string' || Buffer.isBuffer(body) ? body : JSON.stringify(body));
@@ -84,6 +91,12 @@ async function start(options = {}) {
       }
       const cookie = request.headers.cookie?.split(';').map(s => s.trim()).find(s => s.startsWith('upay_session='))?.slice(13);
       const cookieHeader = (token = '') => ({ 'Set-Cookie': `upay_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? 28800 : 0}${origin.startsWith('https:') ? '; Secure' : ''}` });
+      if (route === '/api/ops/status') {
+        requireValue(isGet, 'NOT_FOUND', 404);
+        requireValue(!request.headers.authorization && auth.session(cookie), 'SESSION_REQUIRED', 401);
+        const status = ops.status();
+        return send(response, status.ok ? 200 : 503, status);
+      }
       if (isGet && route === '/api/auth/status') return send(response, 200, auth.status());
       if (isPost && (route === '/api/login' || route.startsWith('/api/auth/'))) {
         requireValue(!request.headers.authorization, 'SESSION_REQUIRED', 401);
@@ -125,6 +138,16 @@ async function start(options = {}) {
           requireValue(url.searchParams.size === 1, 'INVALID_EPAY_ORDER');
           if (url.searchParams.get('state') === 'RECONCILE') return send(response, 200, epay.reconciliations());
           return send(response, 200, epay.order(url.searchParams.get('out_trade_no')));
+        }
+        if (route === '/api/epay/operations' || route === '/api/epay/operations/reviews') {
+          requireValue(epay && request.headers['x-upay-deployment'] === epay.binding.deploymentId,
+            'EPAY_OPERATIONS_UNAVAILABLE', 404);
+          if (isGet && route === '/api/epay/operations') return send(response, 200, epayOperations.queue(epay, url.searchParams));
+          if (isGet && route === '/api/epay/operations/reviews') return send(response, 200, epayOperations.history(epay, url.searchParams));
+          if (isPost && route === '/api/epay/operations/reviews') {
+            requireValue(url.searchParams.size === 0, 'INVALID_EPAY_OPERATIONS_REQUEST');
+            return send(response, 201, epayOperations.record(epay, await body(request), bearer ? 'API_CREDENTIAL' : 'ADMIN_SESSION'));
+          }
         }
         if (route.startsWith('/api/deployment')) {
           requireValue(deployments, 'MULTICHAIN_NOT_ENABLED', 409);
@@ -221,7 +244,7 @@ async function start(options = {}) {
         if (isPost && retry) {
           await body(request); const n = store.notifications().find(x => x.id === decodeURIComponent(retry[1])); requireValue(n, 'NOT_FOUND', 404);
           requireValue(['PENDING', 'FAILED'].includes(n.state), 'NOTIFICATION_NOT_RETRYABLE', 409);
-          n.state = 'PENDING'; n.attempts = 0; n.nextAttempt = 0; store.notify(n); return send(response, 200, { ok: true });
+          n.state = 'PENDING'; n.attempts = 0; n.nextAttempt = 0; n.queuedAt = Date.now(); store.notify(n); return send(response, 200, { ok: true });
         }
         throw new AppError('NOT_FOUND', 404);
       }
@@ -238,8 +261,10 @@ async function start(options = {}) {
   try {
     await new Promise((resolve, reject) => { server.once('error', reject); server.listen(options.port ?? Number(process.env.UPAY_PORT || 8790), '127.0.0.1', resolve); });
   } catch (error) { clearInterval(deploymentTimer); await deploymentHandoff?.close(); await deployments?.close(); await root.close(); throw error; }
+  ops.start();
   return { server, merchant, hooks, store, handoff, epay, deployments, deploymentService, deploymentHandoff, url: `http://127.0.0.1:${server.address().port}`,
     close: async () => {
+      ops.stop();
       clearInterval(deploymentTimer);
       await new Promise(resolve => server.close(resolve));
       await deploymentRefresh;
@@ -247,6 +272,7 @@ async function start(options = {}) {
     } };
 }
 if (require.main === module) start({ multiChain: true,
+  opsEmit: record => console.error(JSON.stringify(record)),
   handoffPort: Number(process.env.UPAY_HANDOFF_PORT || 8791), handoffQuick: !process.env.UPAY_HANDOFF_ORIGIN,
   deploymentPort: Number(process.env.UPAY_DEPLOYMENT_PORT || 8792) }).then(app => {
   console.log('upaynow merchant backend: ' + app.url);

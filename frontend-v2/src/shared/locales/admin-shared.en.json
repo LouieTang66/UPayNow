@@ -263,5 +263,7 @@
   "后台响应超时。若已开始钱包操作，请先核对原任务，不要重复发送。": "The backend response timed out. If you have already started a wallet operation, check the original task first. Do not send again.",
   "后台返回了无法识别的数据，请检查服务状态。": "The backend returned unrecognized data. Check the service status.",
   "操作未完成（{0}）。": "The operation was not completed ({0}).",
-  "未知原因": "Unknown reason"
+  "未知原因": "Unknown reason",
+  "已上链 · 部分无余额": "On-chain · Some orders had no balance",
+  "已上链 · 无余额转出": "On-chain · No balance transferred"
 }

@@ -167,5 +167,9 @@
   "正在请求…": "Requesting…",
   "已刷新状态（只查询，不发交易）。": "Status refreshed (query only; no transaction sent).",
   "在钱包交易记录中复制“创建合约”交易的哈希。登记不会发送新交易。": "Copy the hash of the contract creation transaction from your wallet's transaction history. Registering it does not send a new transaction.",
-  "钱包账户已变化，请重新连接。未知任务不会自动重发。": "The wallet account has changed. Please reconnect. Tasks with an uncertain status will not be resent automatically; uncertain does not mean failed."
+  "钱包账户已变化，请重新连接。未知任务不会自动重发。": "The wallet account has changed. Please reconnect. Tasks with an uncertain status will not be resent automatically; uncertain does not mean failed.",
+  "归集交易已执行，未转出余额": "Collection ran; no balance transferred",
+  "链上已确认，这笔交易可能已消耗 gas。": "This transaction is confirmed and may have consumed gas.",
+  "归集完成，部分订单无余额": "Collection complete; some orders had no balance",
+  "请按逐笔结果核对。": "Check the per-order results."
 }

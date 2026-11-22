@@ -23,7 +23,7 @@ async function read() {
   const ticket = ++latest;
   try {
     const v = await api();
-    if (ticket < shown || (isTerminal() && !TERMINAL.includes(v.job?.state))) return;
+    if (ticket < shown) return;
     shown = ticket; view = v; failure = null;
     if (record.get()?.beginRefused && v.job?.state === 'PREPARED') record.clear();
   }
@@ -160,7 +160,11 @@ function tick() { if (!view?.expiresAt) return; const ms = new Date(view.expires
 
 function status() {
   const j = view.job, r = record.get();
-  if (j?.state === 'MINED') return j.outcome === 'SUCCESS' ? ['ok', '归集完成', '本批每一笔都已转入固定收款钱包。'] : j.outcome === 'PARTIAL_FAILURE' ? ['warn', '归集部分失败', '失败的订单资金仍在原地址，可在电脑后台处理后重新归集。'] : ['danger', '交易已回滚', '没有资金被转移。'];
+  if (j?.state === 'MINED') {
+    if (j.outcome === 'NO_BALANCE') return ['neutral', '归集交易已执行，未转出余额', '链上已确认，这笔交易可能已消耗 gas。'];
+    if (j.outcome === 'PARTIAL_SUCCESS') return ['info', '归集完成，部分订单无余额', '请按逐笔结果核对。'];
+    return j.outcome === 'SUCCESS' ? ['ok', '归集完成', '本批每一笔都已转入固定收款钱包。'] : j.outcome === 'PARTIAL_FAILURE' ? ['warn', '归集部分失败', '失败的订单资金仍在原地址，可在电脑后台处理后重新归集。'] : ['danger', '交易已回滚', '没有资金被转移。'];
+  }
   if (j?.state === 'SUBMITTED') return ['info', '已提交，等待链上确认', '无需再次操作。'];
   if (j?.state === 'CANCELLED') return ['neutral', '已取消', j.error === 'USER_REJECTED' ? '已取消本次确认，可以重新请求钱包确认。' : '本批没有发送交易。'];
   if (j?.state === 'ABANDONED') return ['unknown', '已由后台人工结束追踪', '这不证明交易没有发出。请回电脑后台核对，不要重复发起。'];
@@ -224,6 +228,8 @@ function render() {
   window.ethereum?.on?.('chainChanged', () => { revision++; account = null; review = null; render(); });
   render();
   if (token) await read();
+  window.addEventListener('online', () => { if (token && !acting && !closed) read(); });
+  document.addEventListener('visibilitychange', () => { if (token && !document.hidden && !acting && !closed) read(); });
   setInterval(() => { if (!acting && !closed && (!isTerminal() || canRetry())) read(); }, 5000);
   setInterval(tick, 1000);
 })();

@@ -13,6 +13,7 @@ class Handoff {
   constructor(merchant, wallet, options = {}) {
     this.merchant = merchant; this.wallet = wallet; this.store = merchant.store;
     this.options = options;
+    this.preparing = new Map();
     if (options.quick) this.tunnel = new ManagedTunnel(this, { ...(typeof options.quick === 'object' ? options.quick : {}), keepRejectedOpen: true });
     if (options.origin) {
       const url = new URL(options.origin);
@@ -89,10 +90,11 @@ class Handoff {
     await this.merchant.scan();
     const r = await this.merchant.exclusive(async () => {
       const chain = this.chain(), c = chain.config;
-      requireValue(!this.store.jobs().some(j => ['PREPARED', 'SUBMITTING', 'SUBMITTED', 'UNKNOWN'].includes(j.state)), 'TRANSACTION_RECONCILIATION_REQUIRED', 409);
       const paid = body.mode === 'paid' ? await this.merchant.paidPlan(body.orderIds) : null;
       const ids = paid ? paid.entries.map(o => o.id) : body.orderIds;
+      requireValue(ids.length || !paid?.heldCount, 'TRANSACTION_RECONCILIATION_REQUIRED', 409);
       requireValue(ids.length, 'NO_COLLECTABLE_ORDERS', 409);
+      this.wallet.assertAvailable(ids);
       const { pairs } = await chain.encodeCollection(ids, this.store.orders(), body.wrongToken, body.token);
       const entries = [];
       for (let i = 0; i < ids.length; i++) {
@@ -114,6 +116,18 @@ class Handoff {
   }
   async prepare(id, token, body) {
     requireValue(Object.keys(body).every(k => k === 'from'), 'HANDOFF_SCOPE_OVERRIDE', 403);
+    this.authorize(id, token, 'prepare');
+    // A second request must see the job bound by the first, not derive a new
+    // collection plan which filters out that job's now-locked orders.
+    const prior = this.preparing.get(id);
+    const task = prior
+      ? prior.catch(() => {}).then(() => this.prepareTicket(id, token, body))
+      : this.prepareTicket(id, token, body);
+    this.preparing.set(id, task);
+    try { return await task; }
+    finally { if (this.preparing.get(id) === task) this.preparing.delete(id); }
+  }
+  async prepareTicket(id, token, body) {
     const r = this.authorize(id, token, 'prepare');
     requireValue(r.state === 'READY', 'HANDOFF_USED', 409);
     if (r.jobId) {
@@ -126,7 +140,12 @@ class Handoff {
       requireValue(!fresh.jobId && fresh.state === 'READY', 'HANDOFF_USED', 409);
       fresh.jobId = job.id; job.handoffId = id; this.store.saveHandoff(fresh);
     });
-    if (!result.job) { const fresh = this.record(id); fresh.state = 'EMPTY'; this.store.saveHandoff(fresh); }
+    if (!result.job) {
+      const fresh = this.authorize(id, token, 'prepare');
+      requireValue(!fresh.jobId && fresh.state === 'READY', 'HANDOFF_USED', 409);
+      fresh.state = 'EMPTY';
+      this.store.saveHandoff(fresh);
+    }
     return { job: this.jobView(result.job), summary: result.summary };
   }
   async action(id, token, action, body) {

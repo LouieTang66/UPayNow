@@ -3,18 +3,16 @@ const { DatabaseSync } = require('node:sqlite');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { acquireStateOwnership } = require('./state-ownership.cjs');
 
 class Store {
   constructor(dir) {
-    fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
     this.dir = dir;
-    this.ownerFile = path.join(dir, "owner.lock");
-    this.owner = JSON.stringify({ pid: process.pid, nonce: crypto.randomBytes(16).toString("hex") });
-    try { fs.writeFileSync(this.ownerFile, this.owner, { flag: "wx", mode: 0o600 }); }
-    catch (error) { if (error.code === "EEXIST") throw new Error("STATE_DIRECTORY_LOCKED: stop its owner; after a crash verify PID before removing owner.lock"); throw error; }
-    this.db = new DatabaseSync(path.join(dir, 'merchant.sqlite'));
-    fs.chmodSync(path.join(dir, 'merchant.sqlite'), 0o600);
-    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
+    this.releaseOwnership = acquireStateOwnership(dir);
+    try {
+      this.db = new DatabaseSync(path.join(dir, 'merchant.sqlite'));
+      fs.chmodSync(path.join(dir, 'merchant.sqlite'), 0o600);
+      this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS orders (id TEXT PRIMARY KEY, reference TEXT NOT NULL UNIQUE,
         public_token TEXT NOT NULL UNIQUE, body TEXT NOT NULL);
@@ -24,10 +22,19 @@ class Store {
       CREATE TABLE IF NOT EXISTS anchors (number INTEGER PRIMARY KEY, hash TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, state TEXT NOT NULL, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS notifications (id TEXT PRIMARY KEY, state TEXT NOT NULL, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS notifications_state ON notifications(state);
       CREATE TABLE IF NOT EXISTS handoffs (id TEXT PRIMARY KEY, body TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS epay_orders (reference TEXT PRIMARY KEY, state TEXT NOT NULL,
         next_attempt INTEGER NOT NULL, body TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS epay_due ON epay_orders(state, next_attempt);`);
+      CREATE INDEX IF NOT EXISTS epay_due ON epay_orders(state, next_attempt);
+      CREATE INDEX IF NOT EXISTS epay_operator_state ON epay_orders(state);
+      CREATE TABLE IF NOT EXISTS epay_operator_reviews (
+        id INTEGER PRIMARY KEY, reference TEXT NOT NULL, revision TEXT NOT NULL, body TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS epay_operator_reviews_reference ON epay_operator_reviews(reference, id);`);
+    } catch (error) {
+      try { this.db?.close(); } finally { this.releaseOwnership(); }
+      throw error;
+    }
   }
   secret(name) {
     const file = path.join(this.dir, name + '.secret');
@@ -83,13 +90,29 @@ class Store {
       SET state=excluded.state,next_attempt=excluded.next_attempt,body=excluded.body`)
       .run(q.reference, q.state, q.nextAttempt, JSON.stringify(q));
   }
-  dueEpay(now) {
-    return this.db.prepare("SELECT body FROM epay_orders WHERE state='PENDING' AND next_attempt<=? ORDER BY next_attempt,rowid LIMIT 25")
-      .all(now).map(r => JSON.parse(r.body));
+  dueEpay(now, maxAttempts) {
+    return this.db.prepare(`SELECT body FROM epay_orders WHERE state='PENDING'
+      AND (next_attempt<=? OR json_extract(body, '$.attempts')>=?) ORDER BY next_attempt,rowid LIMIT 25`)
+      .all(now, maxAttempts).map(r => JSON.parse(r.body));
   }
   epayReconcile() {
     return this.db.prepare("SELECT body FROM epay_orders WHERE state='RECONCILE' ORDER BY rowid DESC LIMIT 100")
       .all().map(r => JSON.parse(r.body));
+  }
+  epayOperationRows(state, prefix, before, limit) {
+    return this.db.prepare(`SELECT q.rowid AS cursor, q.body, (
+      SELECT r.body FROM epay_operator_reviews r WHERE r.reference=q.reference ORDER BY r.id DESC LIMIT 1
+    ) AS review FROM epay_orders q WHERE q.state=? AND q.rowid<? AND q.reference>=? AND q.reference<?
+    ORDER BY q.rowid DESC LIMIT ?`).all(state, before, prefix, prefix + '\uffff', limit)
+      .map(r => ({ cursor: r.cursor, order: JSON.parse(r.body), review: r.review ? JSON.parse(r.review) : null }));
+  }
+  epayOperatorReviews(reference, before, limit) {
+    return this.db.prepare('SELECT id,body FROM epay_operator_reviews WHERE reference=? AND id<? ORDER BY id DESC LIMIT ?')
+      .all(reference, before, limit).map(row => ({ cursor: row.id, review: JSON.parse(row.body) }));
+  }
+  saveEpayOperatorReview(reference, review) {
+    this.db.prepare('INSERT INTO epay_operator_reviews(reference,revision,body) VALUES (?,?,?)')
+      .run(reference, review.revision, JSON.stringify(review));
   }
   notifications() { return this.db.prepare('SELECT body FROM notifications ORDER BY rowid').all().map(r => JSON.parse(r.body)); }
   notify(n) { this.db.prepare('INSERT INTO notifications VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET state=excluded.state,body=excluded.body').run(n.id, n.state, JSON.stringify(n)); }
@@ -97,7 +120,7 @@ class Store {
     if (this.closed) return;
     this.closed = true;
     this.db.close();
-    if (fs.readFileSync(this.ownerFile, "utf8") === this.owner) fs.unlinkSync(this.ownerFile);
+    this.releaseOwnership();
   }
 }
 module.exports = { Store };

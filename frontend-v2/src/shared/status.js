@@ -34,6 +34,8 @@ export function job(j) {
     : j.manualResolution.result === 'FAILED' ? { label: '人工确认失败', tone: 'danger' } : { label: '人工结案 · 未核实', tone: 'neutral' };
   if (j.state === 'MINED') {
     if (j.outcome === 'SUCCESS') return { label: '已上链 · 全部成功', tone: 'ok' };
+    if (j.outcome === 'PARTIAL_SUCCESS') return { label: '已上链 · 部分无余额', tone: 'info' };
+    if (j.outcome === 'NO_BALANCE') return { label: '已上链 · 无余额转出', tone: 'neutral' };
     if (j.outcome === 'PARTIAL_FAILURE') return { label: '已上链 · 部分失败', tone: 'warn' };
     if (j.outcome === 'REVERTED') return { label: '交易回滚', tone: 'danger' };
   }
@@ -54,7 +56,7 @@ export function orderCollection(order) {
   if (latest.state === 'MINED' && latest.outcome !== 'REVERTED') {
     const events = (latest.events || []).filter(e => !e.orderHash || e.orderHash === order.orderHash);
     if (events.some(e => e.name === 'CollectFailed')) return { label: '归集失败', tone: 'danger', job: latest };
-    if (events.some(e => e.name === 'Collected')) return { label: '已归集', tone: 'ok', job: latest };
+    if (events.some(e => e.name === 'Collected' || e.name === 'WrongTokenCollected')) return { label: '已归集', tone: 'ok', job: latest };
     return { label: '已执行 · 无余额', tone: 'neutral', job: latest };
   }
   const s = job(latest);
@@ -166,6 +168,9 @@ const ERRORS = {
   WEBHOOK_HOST_NOT_ALLOWED: '通知地址的域名不在服务器允许列表中。',
   UPSTREAM_OR_STORAGE_ERROR: '后台或链上节点暂时不可用。',
   NETWORK_ERROR: '无法连接后台，请检查网络。',
+  EPAY_OPERATIONS_UNAVAILABLE: '当前部署未启用 EPay 对账。',
+  INVALID_EPAY_OPERATIONS_REQUEST: 'EPay 对账请求无效。',
+  EPAY_REVIEW_STALE: '此订单的异常状态已经变化，请刷新后重新核对。',
   REQUEST_TIMEOUT: '后台响应超时。若已开始钱包操作，请先核对原任务，不要重复发送。',
   INVALID_API_RESPONSE: '后台返回了无法识别的数据，请检查服务状态。',
 };

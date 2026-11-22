@@ -7,6 +7,7 @@ Start with installation, then follow the relevant merchant workflow. The API and
 ## Merchants and deployers
 
 - [Installation and HTTPS deployment](INSTALLATION.en.md): prerequisites, persistent data, first start, the three access points, shutdown, and backups.
+- [Operating UPayNow](OPS.en.md): service restart, payment alerts, backups, and recovery drills.
 - [Merchant operations guide](OPERATIONS.en.md): first-time password setup, adding networks, deployments, orders, desktop and mobile collection, wrong-token and wrong-chain recovery, and maintenance.
 - [Authentication](AUTHENTICATION.en.md): the login password, recovery key, separate API credential, and forgotten passwords.
 - [Security boundaries and production checks](SECURITY.en.md): server and wallet protection, confirmations, unknown transactions, token limits, and consistent backups.

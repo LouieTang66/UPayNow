@@ -6,8 +6,12 @@ const fs = require('node:fs');
 const http = require('node:http');
 const os = require('node:os');
 const path = require('node:path');
+const { DatabaseSync } = require('node:sqlite');
+const { backup, generateKey } = require('../../scripts/ops-backup.cjs');
+const { restore } = require('../../scripts/ops-restore.cjs');
 const { start } = require('../server.cjs');
 const { Store } = require('../store.cjs');
+const { acquireStateOwnership } = require('../state-ownership.cjs');
 const { signature, parseForm, usdtUnits, environment, SOURCE_PREFIX } = require('../epay.cjs');
 const { Webhooks } = require('../webhooks.cjs');
 const { apiKey } = require('./helpers/auth.cjs');
@@ -51,25 +55,28 @@ function request(app, route, { method = 'GET', body, host = new URL(PUBLIC).host
 }
 
 async function fixture(t, config = DEFAULT) {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upay-epay-test-'));
+  const dir = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'upay-epay-test-'));
   const initial = new Store(dir);
   initial.set('config', { rpcUrl: 'https://not-used.example.test', chainId: 56, confirmations: 3, startBlock: 100,
     factory: '0x0000000000000000000000000000000000000300', payout: '0x0000000000000000000000000000000000000400',
     tokens: [{ address: TOKEN, decimals: 6, symbol: 'SYN' }, { address: OTHER, decimals: 6, symbol: 'OTHER' }] });
   initial.close();
   let app;
-  const restart = async (epay = config, publicOrigin = PUBLIC) => {
+  const stop = async () => {
     if (app) await app.close();
     app = null;
-    app = await start({ dir, port: 0, pollMs: 0, publicOrigin, epay });
+  };
+  const restart = async (epay = config, publicOrigin = PUBLIC, stateDir = dir) => {
+    await stop();
+    app = await start({ dir: stateDir, port: 0, pollMs: 0, publicOrigin, epay });
     const chain = app.merchant.chain;
     chain.identity = async () => {};
     chain.head = async () => 100;
     chain.factory = { predictAddress: async hash => '0x' + hash.slice(-40) };
     return app;
   };
-  t.after(async () => { await app?.close(); fs.rmSync(dir, { recursive: true, force: true }); });
-  return { app: await restart(), restart };
+  t.after(async () => { await stop(); fs.rmSync(dir, { recursive: true, force: true }); });
+  return { app: await restart(), restart, stop };
 }
 
 const reference = id => SOURCE_PREFIX + '1001:' + id;
@@ -213,7 +220,9 @@ test('confirmed native payment notifies New API, retries lost ACK with one synth
   assert.equal(messages.length, 2);
   assert.deepEqual(messages[0], messages[1]);
   assert.deepEqual([...credits], [[BASE.out_trade_no, 10]]);
-  assert.equal((await operator(app)).json.state, 'DELIVERED');
+  const acknowledged = (await operator(app)).json;
+  assert.equal(acknowledged.state, 'DELIVERED');
+  assert.equal(acknowledged.callbackOutcomeUnknown, undefined);
   assert.equal((await request(app, checkout)).json.epayReturnUrl, DEFAULT.returnUrl);
   blockchain(app, order, { reverse: true });
   assert.equal((await operator(app)).json.state, 'RECONCILE');
@@ -225,6 +234,109 @@ test('confirmed native payment notifies New API, retries lost ACK with one synth
   assert.deepEqual(reconciliations.json.map(q => q.outTradeNo), [BASE.out_trade_no]);
   assert.equal(messages.length, 2);
 });
+
+test('a restored pending EPay callback keeps its identity and an idempotent synthetic receiver credits only once',
+  { skip: process.platform !== 'linux' }, async t => {
+    const isolated = fs.mkdtempSync(path.join(fs.realpathSync(os.tmpdir()), 'upay-epay-backup-test-'));
+    let f;
+    t.after(async () => { await f?.stop(); fs.rmSync(isolated, { recursive: true, force: true }); });
+    const mkdir = (name) => { const result = path.join(isolated, name); fs.mkdirSync(result, { mode: 0o700 }); return result; };
+    try {
+      acquireStateOwnership(mkdir('capability-probe'), { requireGuard: true, recoverStale: false })();
+    } catch (error) {
+      if (error.code !== 'STATE_GUARD_UNAVAILABLE') throw error;
+      t.skip('The temporary filesystem does not support the required state-ownership guard.');
+      return;
+    }
+    f = await fixture(t);
+    const archive = path.join(mkdir('archive'), 'pending.upaybak');
+    const key = path.join(mkdir('keys'), 'backup.key');
+    const destinationParent = mkdir('restores');
+    // This independent database stands in for a store ledger. It is not part of
+    // the UPayNow backup and represents an explicitly idempotent receiver.
+    const ledger = path.join(mkdir('mock-store'), 'credits.sqlite');
+    function withLedger(fn) {
+      const db = new DatabaseSync(ledger);
+      try { return fn(db); } finally { db.close(); }
+    }
+    withLedger(db => db.exec(`CREATE TABLE credits (
+      out_trade_no TEXT PRIMARY KEY, trade_no TEXT NOT NULL, amount TEXT NOT NULL
+    )`));
+    generateKey(key);
+    let app = f.app;
+    const originalState = app.store.dir;
+    const created = await request(app, '/epay/submit.php?' + signed());
+    assert.equal(created.status, 303);
+    const orderReference = reference(BASE.out_trade_no);
+    const nativeIdentity = order => ({
+      id: order.id, reference: order.reference, address: order.address, publicToken: order.publicToken,
+    });
+    const originalOrder = app.store.reference(orderReference);
+    const originalBinding = app.epay.binding;
+    assert.equal(originalBinding.deploymentId, 'legacy');
+    blockchain(app, originalOrder, { units: 10000000 });
+    const queued = (await operator(app)).json;
+    assert.equal(queued.state, 'PENDING');
+    assert.equal(queued.attempts, 0);
+    await f.stop();
+    backup({ state: originalState, archive, key, offline: true });
+
+    const deliveries = [];
+    const mockNewAPI = async (target, profile) => {
+      assert.equal(target.url, DEFAULT.notifyUrl);
+      assert.equal(profile.method, 'POST');
+      assert.ok(profile.beforeSend());
+      const params = Object.fromEntries(new URLSearchParams(profile.payload));
+      assert.equal(params.sign, wireSign(params));
+      assert.equal(params.sign_type, 'MD5');
+      assert.equal(params.trade_status, 'TRADE_SUCCESS');
+      assert.equal(params.out_trade_no, BASE.out_trade_no);
+      assert.equal(params.trade_no, queued.tradeNo);
+      assert.equal(params.money, BASE.money);
+      // Commit before acknowledging; every invocation opens the persisted DB.
+      const { changes } = withLedger(db => db.prepare(
+        'INSERT INTO credits VALUES (?, ?, ?) ON CONFLICT(out_trade_no) DO NOTHING'
+      ).run(params.out_trade_no, params.trade_no, params.money));
+      deliveries.push({ payload: profile.payload, changes });
+      return profile.accept(200, 'success');
+    };
+    app = await f.restart();
+    app.epay.transport.send = mockNewAPI;
+    // Refresh only synthetic chain state after restart; no external RPC.
+    blockchain(app, originalOrder);
+    await app.epay.tick();
+    assert.equal((await operator(app)).json.state, 'DELIVERED');
+    assert.equal(deliveries.length, 1);
+    assert.equal(deliveries[0].changes, 1);
+    await f.stop();
+
+    const recovered = restore({ archive, key, destinationParent });
+    assert.equal(recovered.databases, 1);
+    assert.notEqual(recovered.directory, originalState);
+    app = await f.restart(DEFAULT, PUBLIC, recovered.directory);
+    const recoveredOrder = app.store.reference(orderReference);
+    assert.deepEqual(nativeIdentity(recoveredOrder), nativeIdentity(originalOrder));
+    assert.deepEqual(app.epay.binding, originalBinding);
+    const restoredQueue = (await operator(app)).json;
+    assert.equal(restoredQueue.orderId, queued.orderId);
+    assert.equal(restoredQueue.tradeNo, queued.tradeNo);
+    assert.equal(restoredQueue.state, 'PENDING');
+    assert.equal(restoredQueue.attempts, 0);
+    app.epay.transport.send = mockNewAPI;
+    blockchain(app, recoveredOrder);
+    await app.epay.tick();
+    await app.epay.tick();
+    const delivered = (await operator(app)).json;
+    assert.equal(delivered.state, 'DELIVERED');
+    assert.equal(delivered.attempts, 1);
+    assert.equal(deliveries.length, 2);
+    assert.equal(deliveries[1].payload, deliveries[0].payload);
+    assert.equal(deliveries[1].changes, 0);
+    const allCredits = withLedger(db => db.prepare('SELECT * FROM credits').all().map(row => ({ ...row })));
+    assert.deepEqual(allCredits, [{
+      out_trade_no: BASE.out_trade_no, trade_no: queued.tradeNo, amount: BASE.money,
+    }]);
+  });
 
 test('reorg during preflight suppresses stale success; lost ACK without response still flags reconciliation', async t => {
   const { app } = await fixture(t);
@@ -344,4 +456,87 @@ test('EPay checkout reaches delivery after an actual transfer on the isolated lo
   assert.equal(notices.length, 1);
   assert.equal(notices[0].out_trade_no, BASE.out_trade_no);
   assert.equal((await operator(app)).json.state, 'DELIVERED');
+});
+
+test('restart reconciles an exhausted in-flight callback without opening the transport', async t => {
+  const f = await fixture(t);
+  let app = f.app;
+  assert.equal((await request(app, '/epay/submit.php?' + signed())).status, 303);
+  const ref = reference(BASE.out_trade_no);
+  const order = app.store.reference(ref);
+  blockchain(app, order, { units: 10000000 });
+  const queued = app.store.epayReference(ref);
+  queued.attempts = 8;
+  queued.callbackAttemptInFlight = true;
+  queued.nextAttempt = Date.now() + 240_000;
+  queued.lastError = 'EPAY_CALLBACK_NOT_ACKNOWLEDGED';
+  app.store.saveEpay(queued);
+
+  app = await f.restart();
+  let dispatches = 0;
+  app.epay.transport.send = async () => { dispatches++; return false; };
+  await app.epay.tick();
+  await app.epay.tick();
+  assert.equal(dispatches, 0);
+  const q = (await operator(app)).json;
+  assert.equal(q.state, 'RECONCILE');
+  assert.equal(q.reconcileReason, 'FINAL_CALLBACK_OUTCOME_UNKNOWN');
+  assert.equal(q.callbackOutcomeUnknown, true);
+  assert.equal(q.attempts, 8);
+  assert.equal(q.tradeNo, queued.tradeNo);
+  assert.equal(q.generation, queued.generation);
+  assert.equal(q.lastError, queued.lastError);
+
+  blockchain(app, order, { reverse: true });
+  const reversed = (await operator(app)).json;
+  assert.equal(reversed.state, 'RECONCILE');
+  assert.equal(reversed.reconcileReason, 'CHAIN_REVERSAL');
+  assert.equal(reversed.callbackOutcomeUnknown, true);
+  assert.ok(reversed.reversedAt);
+});
+
+test('EPay final callback keeps definitive outcomes and parks uncertain ones for review', async t => {
+  const f = await fixture(t);
+  const cases = [
+    { name: 'ack', verdict: profile => profile.accept(200, 'success'), state: 'DELIVERED' },
+    { name: 'reject', verdict: profile => profile.accept(200, 'fail'), state: 'FAILED' },
+    { name: 'timeout', verdict() { throw Error('fixture transport interrupted'); }, state: 'RECONCILE' },
+    { name: 'inexact', verdict: profile => profile.accept(503, 'fail'), state: 'RECONCILE' },
+    { name: 'olderUnknown', verdict: profile => profile.accept(200, 'fail'), inFlight: true, state: 'RECONCILE' },
+    { name: 'olderUnknownAck', verdict: profile => profile.accept(200, 'success'), inFlight: true, state: 'DELIVERED' },
+  ];
+  const app = f.app;
+  for (const c of cases) {
+    const id = c.name;
+    assert.equal((await request(app, '/epay/submit.php?' + signed({ out_trade_no: id }))).status, 303);
+    const ref = reference(id);
+    const order = app.store.reference(ref);
+    blockchain(app, order, { units: 10000000 });
+    const queued = app.store.epayReference(ref);
+    queued.attempts = 7;
+    queued.callbackAttemptInFlight = c.inFlight ?? false;
+    app.store.saveEpay(queued);
+
+    let dispatches = 0;
+    app.epay.transport.send = async (_target, profile) => {
+      dispatches++;
+      assert.equal(profile.beforeSend(), true);
+      const reserved = app.store.epayReference(ref);
+      assert.equal(reserved.attempts, 8);
+      assert.equal(reserved.callbackAttemptInFlight, true);
+      return c.verdict(profile);
+    };
+    await app.epay.tick();
+    await app.epay.tick();
+    assert.equal(dispatches, 1, id);
+    const result = (await operator(app, id)).json;
+    assert.equal(result.state, c.state, id);
+    assert.equal(result.attempts, 8, id);
+    if (c.state === 'RECONCILE') assert.equal(result.reconcileReason, 'FINAL_CALLBACK_OUTCOME_UNKNOWN', id);
+    else {
+      assert.equal(result.reconcileReason, undefined, id);
+      assert.equal(result.callbackOutcomeUnknown, undefined, id);
+      assert.equal(app.store.epayReference(ref).callbackOutcomeUnknown, undefined, id);
+    }
+  }
 });

@@ -3,6 +3,8 @@ import { dateTime, relative } from '../../shared/format.js';
 import { NOTIFY } from '../../shared/status.js';
 import { busy, toast, emptyState, loadingRows, errorState , actionButton } from '../ui.js';
 
+import { epayOperationsPanel } from './epay-operations.js';
+
 const TYPE = { 'payment.paid': '付款已确认', 'payment.reversed': '付款被撤回（链重组）' };
 
 export function notificationsPage(app) {
@@ -29,5 +31,6 @@ export function notificationsPage(app) {
     failed ? h('div', { class: 'notice warn', role: 'status', style: undefined }, h('div', { class: 'notice-body' }, h('strong', null, `${failed} 条通知发送失败`),
       '已自动重试 8 次。请确认商城接收地址可用后重新排队，事件 ID 不变，商城应按事件 ID 去重。')) : null,
     h('section', { class: 'card section-gap' }, body),
+    app.keep('epay-operations', () => epayOperationsPanel(app)),
     h('p', { class: 'muted small section-gap' }, '提示：同一订单在链重组后可能先收到“撤回”、再收到新的“付款已确认”。商城应以订单号和订单当前状态为准决定是否发货，不要每收到一次付款通知就发一次货。'));
 }

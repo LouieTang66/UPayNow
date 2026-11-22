@@ -93,13 +93,19 @@ await assert.rejects(connecting); resolveConnect(); await new Promise(setImmedia
   const { keccak256 } = await import('ethers');
   const node = (tag, attrs, ...children) => ({ tag, attrs, children });
   const s = { address: accounts[0], chainId: 97, revision: 1 };
+  let preparation = 'mixed';
   const api = { async get(route, scope) { scopes.push(scope.deploymentId); return { ...config, payout: accounts[0] }; }, async post(route, body, scope) {
     scopes.push(scope.deploymentId); events.push(route.split('/').at(-1));
-    if (route === 'wallet/prepare') return { job: { id: 'J', orderIds: ['APPROVED'], state: 'PREPARED' }, summary: { chainId: 97, from: s.address, to: config.factory, value: '0x0', calldataHash: keccak256('0x1234') } };
+    if (route === 'wallet/prepare') {
+      if (preparation === 'held') throw Object.assign(Error('still awaiting original transaction'), { code: 'TRANSACTION_RECONCILIATION_REQUIRED' });
+      if (preparation === 'empty') return { job: null, heldCount: 0 };
+      return { heldCount: 1, job: { id: 'J', orderIds: ['APPROVED'], state: 'PREPARED' }, summary: { chainId: 97, from: s.address, to: config.factory, value: '0x0', calldataHash: keccak256('0x1234') } };
+    }
     if (route.endsWith('/begin')) return { job: { state: 'UNKNOWN' }, transaction: tx };
     return { state: 'SUBMITTED' };
   } };
-  const d = { closed: false, setTitle() {}, setBody() {}, setFoot(...nodes) { this.foot = nodes; }, close() { this.closed = true; } };
+  const dialog = () => ({ closed: false, setTitle() {}, setBody(...nodes) { this.body = nodes; }, setFoot(...nodes) { this.foot = nodes; }, close() { this.closed = true; } });
+  const d = dialog();
   const app = { client: api, state: { mode: 'live', selectedId: 'ORIGINAL' }, refresh() {}, refreshDeployments() {} };
   const context = { h: node, notice: node, kv: node, copyable: node, keccak256, createAttempt,
     connectWallet: async () => s, assertWallet: async () => {}, walletSender: async () => async () => { events.push('send'); return hash; }, metadata: () => ({ name: 'BSC Testnet', symbol: 'BNB' }),
@@ -108,10 +114,18 @@ await assert.rejects(connecting); resolveConnect(); await new Promise(setImmedia
   vm.createContext(context); vm.runInContext(desktopSource + '\nglobalThis.flow = { desktopFlow, desktopBusy };', context);
   await context.flow.desktopFlow(app, d, { kind: 'injected', deploymentId: 'ORIGINAL', intent: { mode: 'paid', orderIds: ['APPROVED'] } });
   assert.deepEqual(events, ['prepare']); assert(context.flow.desktopBusy());
+  assert.match(JSON.stringify(d.body), /部分订单仍在等原交易核对/);
   app.state.selectedId = 'OTHER';
   const sendButton = d.foot.at(-1); const click = { currentTarget: { disabled: false } };
   await Promise.all([sendButton.attrs.onclick(click), sendButton.attrs.onclick(click)]);
   assert.deepEqual(events, ['prepare', 'begin', 'send', 'attach']); assert(scopes.every(id => id === 'ORIGINAL')); assert(!context.flow.desktopBusy()); checks++;
+  for (const [mode, expected, unexpected] of [['held', /still awaiting original transaction/, /没有可归集余额/], ['empty', /没有可归集余额/, /still awaiting original transaction/]]) {
+    preparation = mode;
+    const result = dialog();
+    await context.flow.desktopFlow(app, result, { kind: 'injected', deploymentId: 'ORIGINAL', intent: { mode: 'paid', orderIds: ['APPROVED'] } });
+    assert.match(JSON.stringify(result.body), expected); assert.doesNotMatch(JSON.stringify(result.body), unexpected);
+    assert.equal(events.filter(e => e === 'send').length, 1); assert(!context.flow.desktopBusy()); checks++;
+  }
 }
 // Explicit pre-transition BUSY is bounded, and only a successful unchanged
 // PREPARED readback clears uncertainty. No wallet send can happen here.

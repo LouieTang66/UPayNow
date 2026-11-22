@@ -9,6 +9,14 @@ const MONEY = /^(0|[1-9][0-9]{0,11})\.[0-9]{2}$/;
 const SOURCE_PREFIX = 'epay:new-api:';
 const MAX_FORM = 8192;
 const MAX_ATTEMPTS = 8;
+const CHAIN_REVERSAL = 'CHAIN_REVERSAL';
+const FINAL_CALLBACK_OUTCOME_UNKNOWN = 'FINAL_CALLBACK_OUTCOME_UNKNOWN';
+
+function reconcileCallback(q) {
+  q.state = 'RECONCILE';
+  q.reconcileReason = FINAL_CALLBACK_OUTCOME_UNKNOWN;
+  q.callbackOutcomeUnknown = true;
+}
 
 function endpoint(value) {
   let u;
@@ -94,14 +102,22 @@ function recordNativePayment(store, order) {
     if (['WAITING', 'SUPPRESSED'].includes(q.state)) {
       q.generation = order.generation;
       q.state = 'PENDING';
+      q.queuedAt = Date.now();
       q.attempts = 0;
       q.preflightFailures = 0;
       delete q.lastError;
       q.nextAttempt = 0;
     } else return;
   } else {
-    if (!['PENDING', 'FAILED', 'DELIVERED'].includes(q.state)) return;
-    q.state = q.attempts === 0 ? 'SUPPRESSED' : 'RECONCILE';
+    if (q.state === 'RECONCILE' && q.reconcileReason === FINAL_CALLBACK_OUTCOME_UNKNOWN) {
+      // Keep the callback uncertainty evidence but invalidate any previous
+      // review of it: the confirmed chain payment has now also reversed.
+      q.reconcileReason = CHAIN_REVERSAL;
+    } else {
+      if (!['PENDING', 'FAILED', 'DELIVERED'].includes(q.state)) return;
+      q.state = q.attempts === 0 ? 'SUPPRESSED' : 'RECONCILE';
+      if (q.state === 'RECONCILE') q.reconcileReason = CHAIN_REVERSAL;
+    }
     q.reversedAt = Date.now();
   }
   store.saveEpay(q);
@@ -111,8 +127,11 @@ function view(q) {
   // No secrets, destinations, payer identifiers or native checkout bearer token.
   const { pid, outTradeNo, tradeNo, orderId, money, type, amount, priceCurrency, token, state,
     generation, attempts, preflightFailures, lastError, nextAttempt, reversedAt, deliveredAt, createdAt } = q;
+  const reconcileReason = q.reconcileReason || (state === 'RECONCILE' && reversedAt ? CHAIN_REVERSAL : undefined);
   return { pid, outTradeNo, tradeNo, orderId, money, type, amount, priceCurrency, token, state,
-    generation, attempts, preflightFailures, lastError, nextAttempt, reversedAt, deliveredAt, createdAt };
+    generation, attempts, preflightFailures, lastError, nextAttempt, reversedAt, deliveredAt, createdAt,
+    ...(reconcileReason ? { reconcileReason } : {}),
+    ...(q.callbackOutcomeUnknown ? { callbackOutcomeUnknown: true } : {}) };
 }
 
 class Epay {
@@ -213,24 +232,43 @@ class Epay {
   }
 
   async run() {
-    for (const q of this.store.dueEpay(Date.now())) {
+    for (const candidate of this.store.dueEpay(Date.now(), MAX_ATTEMPTS)) {
       if (this.closing) break;
+      // Reread after earlier deliveries in this batch have awaited the network.
+      const q = this.store.epayReference(candidate.reference);
+      if (q?.state !== 'PENDING' || q.generation !== candidate.generation) continue;
+      if (q.attempts >= MAX_ATTEMPTS) {
+        // A PENDING row at the cap means dispatch was reserved but the result
+        // was never durably recorded. Never assume the gateway did not credit.
+        reconcileCallback(q);
+        this.store.saveEpay(q);
+        continue;
+      }
       if (!this.eligible(q)) continue;
       const fields = { pid: q.pid, type: q.type, name: q.name, money: q.money, trade_no: q.tradeNo,
         out_trade_no: q.outTradeNo, trade_status: 'TRADE_SUCCESS' };
       fields.sign = signature(fields, this.key); fields.sign_type = 'MD5';
       const payload = new URLSearchParams(fields).toString();
-      let sent = false, ok = false;
+      let sent = false, ok = false, rejected = false;
       try {
         ok = await this.transport.send({ url: this.binding.notifyUrl }, {
-          method: 'POST', payload, accept: (code, text) => code >= 200 && code < 300 && text === 'success',
+          method: 'POST', payload, accept: (code, text) => {
+            const successStatus = code >= 200 && code < 300;
+            rejected = successStatus && text === 'fail';
+            return successStatus && text === 'success';
+          },
           beforeSend: () => {
             const latest = this.store.epayReference(q.reference);
-            if (latest?.state !== 'PENDING' || latest.generation !== q.generation || !this.eligible(latest)) return false;
-            q.attempts = latest.attempts + 1;
-            q.preflightFailures = 0;
-            q.nextAttempt = Date.now() + Math.min(3600000, 1000 * 2 ** q.attempts);
-            this.store.saveEpay(q);
+            if (latest?.state !== 'PENDING' || latest.generation !== q.generation
+              || latest.attempts >= MAX_ATTEMPTS || !this.eligible(latest)) return false;
+            // Old pending rows may not contain attempt outcomes. Conservatively
+            // retain that uncertainty, as well as any interrupted prior send.
+            if (latest.attempts > 0 && latest.callbackAttemptInFlight !== false) latest.callbackOutcomeUnknown = true;
+            latest.callbackAttemptInFlight = true;
+            latest.attempts++;
+            latest.preflightFailures = 0;
+            latest.nextAttempt = Date.now() + Math.min(3600000, 1000 * 2 ** latest.attempts);
+            this.store.saveEpay(latest);
             sent = true;
             return true;
           },
@@ -239,17 +277,30 @@ class Epay {
       const latest = this.store.epayReference(q.reference);
       if (latest?.state !== 'PENDING' || latest.generation !== q.generation) continue;
       if (ok && sent) {
+        latest.callbackAttemptInFlight = false;
         latest.state = 'DELIVERED';
         latest.deliveredAt = Date.now();
+        // The gateway has now acknowledged this stable order reference.
+        delete latest.callbackOutcomeUnknown;
         delete latest.lastError;
       } else if (sent) {
+        latest.callbackAttemptInFlight = false;
         latest.lastError = 'EPAY_CALLBACK_NOT_ACKNOWLEDGED';
-        if (latest.attempts >= MAX_ATTEMPTS) latest.state = 'FAILED';
+        if (!rejected) latest.callbackOutcomeUnknown = true;
+        if (latest.attempts >= MAX_ATTEMPTS) {
+          if (latest.callbackOutcomeUnknown) reconcileCallback(latest);
+          else latest.state = 'FAILED';
+        }
+      } else if (latest.attempts >= MAX_ATTEMPTS) {
+        reconcileCallback(latest);
       } else if (!this.closing && this.eligible(latest)) {
         latest.lastError = 'EPAY_CALLBACK_PREFLIGHT_FAILED';
         latest.preflightFailures = (latest.preflightFailures || 0) + 1;
         latest.nextAttempt = Date.now() + Math.min(3600000, 5000 * 2 ** latest.preflightFailures);
-        if (latest.preflightFailures >= MAX_ATTEMPTS) latest.state = 'FAILED';
+        if (latest.preflightFailures >= MAX_ATTEMPTS) {
+          if (latest.callbackOutcomeUnknown || latest.attempts > 0 && latest.callbackAttemptInFlight !== false) reconcileCallback(latest);
+          else latest.state = 'FAILED';
+        }
       } else continue;
       this.store.saveEpay(latest);
     }
