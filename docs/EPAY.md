@@ -1,5 +1,7 @@
 # New API EPay（可选）
 
+**简体中文** | [English](EPAY.en.md)
+
 UPayNow 提供一个 **New API `v1.0.0-rc.51` 的 EPay MD5 网页充值适配器**。`/epay/submit.php` 只接收该模式的签名订单，确认链上到账后通知 New API 发放余额。不会部署合约、替商户签名、改变既有 API、或改变一单一地址的归集流程。不是通用易支付网关：不支持 RSA、`mapi.php`、退款/代付，以及对任意 EPay 客户端的查询接口。
 
 目标协议来源：[New API 下单及通知](https://github.com/QuantumNous/new-api/blob/v1.0.0-rc.51/controller/topup.go#L271-L476) 和 [go-epay v0.0.6](https://github.com/Calcium-Ion/go-epay/tree/v0.0.6)。本库测试包含本地 EVM 模拟代币转账、链上扫描和合成的 New API 协议对端，不代表已部署完整 New API 或实测主网。可在构建后运行 `node --test backend/test/epay.test.cjs` 重现。

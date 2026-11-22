@@ -1,5 +1,7 @@
 # 开发与隔离检查
 
+**简体中文** | [English](DEVELOPMENT.en.md)
+
 本文面向维护者，不是商户安装/付款步骤；首次使用请看[安装说明](INSTALLATION.md)和[商户操作手册](OPERATIONS.md)。命令以当前根 `package.json` 为准。
 
 ## 运行前

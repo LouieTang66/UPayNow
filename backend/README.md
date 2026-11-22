@@ -1,5 +1,7 @@
 # UPayNow 商城 API 与付款通知
 
+**简体中文** | [English](README.en.md)
+
 先按 [安装说明](../docs/INSTALLATION.md) 从空白实例启动，部署或导入自己的 Factory。运行入口为项目根目录 `npm ci && npm start`。空白实例没有已接入部署、币种或订单；可选网络预设由产品内置；此文不是本地充值或测试网操作教程。日常操作、备份与异常恢复见 [完整操作手册](../docs/OPERATIONS.md)。
 
 ## 认证和部署范围

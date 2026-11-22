@@ -1,5 +1,7 @@
 # 多链、Factory 部署与导入
 
+**简体中文** | [English](MULTICHAIN.en.md)
+
 UPayNow 是单商户自部署工具，一个后台可管理多条兼容当前合约的 EVM 链，同一链也可保留多套不同身份的 Factory。全新实例没有已接入部署、收款钱包或币种；新建网络从服务提供的已开放名单选择，并非任意 EVM 链。日常使用见 [用户操作手册](../docs/OPERATIONS.md)，安装及三个 HTTPS 入口见 [安装说明](../docs/INSTALLATION.md)。
 
 ## 添加自己的部署

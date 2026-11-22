@@ -1,5 +1,7 @@
 # UPayNow 多 CA、同订单地址：合约接口（v3）
 
+**简体中文** | [English](multi-ca-interface.en.md)
+
 项目仓库：<https://github.com/LouieTang66/UPayNow>。此文是当前 `ForwarderFactory` / `ForwarderImpl` 源码接口说明，不是待实现的界面设计稿；标题 v3 指多 CA 合约的 `SALT_VERSION=3`，不等于应用部署方案 `deterministic-v2` 的版本号。此文面向需要直接接入合约的开发者；普通部署者从 [空白安装](INSTALLATION.md) 和 [完整操作手册](OPERATIONS.md) 开始，商城优先使用 [服务器 API](../backend/README.md)。没有预置 Factory、payout 或币种，接口示例不能代替真实部署配置。当前说明不代表主网验收或安全审计完成。
 
 ## 先用简单的话说明
@@ -26,7 +28,7 @@ constructor(address payout_, address[] settlementTokens_)
 - 基本校验不证明资产真伪；准确链 ID、认可 CA 与兼容性仍需事先核实。
 - 名单只在构造时写入，合约没有后续新增、删除、替换接口，也没有管理员或升级权。
 - 已部署 Factory 不能增加 CA、换 payout 或升级，也不会更新旧订单。应用新建 deterministic-v2 还受同链、同 payout、同固定版本唯一 Factory 的限制，不能简单重部署来增币；换 payout 可形成另一身份，版本变更需另行发布兼容性评估，见[部署说明](../backend/MULTICHAIN.md)。
-- 一个 Factory 只在它部署的那条链生效，不会自行跨链转移资产。应用的 deterministic-v2 可在满足严格条件的另一链部署同址 Factory 并找回误付资产；这不是桥接、自动跨链归集或源订单认单，见 [跨链同地址部署与恢复](CROSSCHAIN-V2.md)。
+- 一个 Factory 只在它部署的那条链生效，不会自行跨链转移资产。应用的 deterministic-v2 可在满足严格条件的另一链部署同址 Factory 并找回误付资产；这不是桥接、自动跨链归集或源订单认单，见 [跨链同地址部署与恢复](CROSSCHAIN-V2.zh-CN.md)。
 
 ## 单币版到多币版的变化
 

@@ -1,5 +1,7 @@
 # UPayNow 页面、服务与认证边界
 
+**简体中文** | [English](INTEGRATION.en.md)
+
 ## 启动和路由
 
 项目根目录运行 `npm ci && npm start`。首次实例没有已接入部署、Factory、payout、币种或订单，先登录并从内置已开放网络添加自己的部署；网络预设不等于现成商户合约。构建入口 `npm run build`；构建产物为 `frontend-v2/dist`，管理台与公开页面由各自后台服务挂载，不需要独立前端服务器。

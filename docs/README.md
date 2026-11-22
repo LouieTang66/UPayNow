@@ -1,5 +1,7 @@
 # UPayNow 文档索引
 
+**简体中文** | [English](README.en.md)
+
 先安装，再按商户任务使用；API 和底层合约资料供接入开发者或维护者查阅。
 
 ## 商户与部署者
@@ -25,7 +27,7 @@
 - [手机归集与配置](../backend/MOBILE-HANDOFF.md)：临时入口、固定 HTTPS、会话和发送。
 - [归集票据与任务恢复](../backend/HANDOFF.md)：受限权限、原交易哈希、未知结果和手机/后台隔离。
 - [cloudflared 组件](../backend/CLOUDFLARED.md)：按需官方校验下载、缓存和错误排查。
-- [跨链同地址与找回](CROSSCHAIN-V2.md)：版本、入口、原订单身份、目标部署及固定资金去向。
+- [跨链同地址与找回](CROSSCHAIN-V2.zh-CN.md)：版本、入口、原订单身份、目标部署及固定资金去向。
 - [多 CA 合约接口](multi-ca-interface.md)：支持币种、错币和批量逐项结果等底层语义，不代替商户操作教程。
 
 ## 开发与项目网络维护者

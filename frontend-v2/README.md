@@ -1,5 +1,7 @@
 # UPayNow 用户界面
 
+**简体中文** | [English](README.en.md)
+
 这是 UPayNow 的管理台、顾客收银台和手机钱包确认页面。项目仓库：<https://github.com/LouieTang66/UPayNow>。页面使用同源真实服务数据，接口错误不能以虚构订单、余额或成功状态替代。
 
 ## 首次使用

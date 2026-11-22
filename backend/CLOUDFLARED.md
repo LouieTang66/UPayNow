@@ -1,5 +1,7 @@
 # 手机入口的 cloudflared 组件
 
+**简体中文** | [English](CLOUDFLARED.en.md)
+
 日常操作见 [用户操作手册](../docs/OPERATIONS.md)。本页是部署者的组件技术说明；固定 HTTPS 手机入口不需要 cloudflared。普通启动不会因此下载组件或开放公网，只有明确打开临时手机入口才按需准备。
 
 仅 `ManagedTunnel.open()`（用户点击手机入口）准备组件，启动后台、查询状态不会下载。准备阶段维持 STARTING；下载最多 120 秒，完成后才开始原有 50 秒 connector 启动预算。手机会话仍从 connector ready 起最长 5 分钟，独立 worker/专用端口/授权/UNKNOWN 锁与 secret 环境隔离不变。

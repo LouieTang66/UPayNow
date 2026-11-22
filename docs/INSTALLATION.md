@@ -1,5 +1,7 @@
 # UPayNow 安装与部署
 
+**简体中文** | [English](INSTALLATION.en.md)
+
 仓库：<https://github.com/LouieTang66/UPayNow>。通过已获授权的访问方式获取源码，进入项目根目录。以下从全新空白实例开始，不需要复制任何现成链配置或个人部署数据。
 
 本文面向部署者；后台逐屏操作见[商户操作手册](OPERATIONS.md)，文档总入口见[文档索引](README.md)。
