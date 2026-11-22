@@ -1,5 +1,7 @@
 # 安全问题反馈
 
+**简体中文** | [English](SECURITY.en.md)
+
 请不要通过公开 GitHub Issue 发布可利用的漏洞、真实凭据或完整实例备份。私下联系：
 
 - Email：hi@louie66.com

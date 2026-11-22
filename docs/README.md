@@ -1,5 +1,7 @@
 # UPayNow 文档索引
 
+**简体中文** | [English](README.en.md)
+
 先安装，再按商户任务使用；API 和底层合约资料供接入开发者或维护者查阅。
 
 ## 商户与部署者
@@ -12,6 +14,7 @@
 
 ## 商城接入开发者
 
+- [New API 的 EPay 兼容接入](EPAY.md)：可选开关、网关和回调配置、模拟验收及异常对账。
 - [商城 API、验签、重试和迟付](../backend/README.md)：开单、查单、部署选择、付款通知及显式接受迟付。
 - [前端与服务接口](../frontend-v2/INTEGRATION.md)：静态页面角色、API 和手机专用入口的边界。
 - [前端使用与开发说明](../frontend-v2/README.md)：页面、构建及相关开发检查。
@@ -24,7 +27,7 @@
 - [手机归集与配置](../backend/MOBILE-HANDOFF.md)：临时入口、固定 HTTPS、会话和发送。
 - [归集票据与任务恢复](../backend/HANDOFF.md)：受限权限、原交易哈希、未知结果和手机/后台隔离。
 - [cloudflared 组件](../backend/CLOUDFLARED.md)：按需官方校验下载、缓存和错误排查。
-- [跨链同地址与找回](CROSSCHAIN-V2.md)：版本、入口、原订单身份、目标部署及固定资金去向。
+- [跨链同地址与找回](CROSSCHAIN-V2.zh-CN.md)：版本、入口、原订单身份、目标部署及固定资金去向。
 - [多 CA 合约接口](multi-ca-interface.md)：支持币种、错币和批量逐项结果等底层语义，不代替商户操作教程。
 
 ## 开发与项目网络维护者
@@ -32,7 +35,7 @@
 - [开发与隔离检查](DEVELOPMENT.md)：构建、定向测试、固定发布输入与不同验收证据的边界。
 
 - [公共部署入口工具](../ops-public-deployer/README.md)：开放网络前的公共入口预检和部署。它不是商户初次使用的额外必做步骤。
-- [确定性跨链开发测试](../test/fixtures/CROSSCHAIN.md)：隔离测试背景，不代表任意生产网络、实体钱包或真实找回已验收。
+- [确定性跨链开发测试](../test/fixtures/CROSSCHAIN.md)：隔离跨链测试场景。
 
 ## 许可与版本
 

@@ -2,6 +2,7 @@
 const crypto = require('node:crypto');
 const { Chain, AppError, requireValue, address, ethers, transfer } = require('./chain.cjs');
 const { publicJob } = require('./job-view.cjs');
+const { recordNativePayment, SOURCE_PREFIX } = require('./epay.cjs');
 class Merchant {
   constructor(store, options = {}) {
     this.store = store;
@@ -68,10 +69,14 @@ class Merchant {
       sendMode: 'CONNECTED_WALLET', gasWallet: null };
   }
   requireChain() { requireValue(this.chain, 'CHAIN_NOT_CONFIGURED', 409); return this.chain; }
-  async create(body) {
+  async create(body, { epay = false } = {}) {
     return this.exclusive(async () => {
       const chain = this.requireChain();
       requireValue(typeof body.reference === 'string' && body.reference.length > 0 && body.reference.length <= 128, 'INVALID_REFERENCE');
+      const quote = body.reference.startsWith(SOURCE_PREFIX) ? this.store.epayReference(body.reference) : null;
+      requireValue(epay || !quote, 'REFERENCE_RESERVED_BY_EPAY', 409);
+      requireValue(!epay || quote && quote.token === body.token && quote.amount === body.amount && !body.webhookUrl
+        && body.expiresInSeconds === undefined, 'EPAY_QUOTE_MISMATCH', 409);
       const token = chain.config.tokens.find(t => t.address === address(body.token));
       requireValue(token, 'UNSUPPORTED_TOKEN');
       requireValue(typeof body.amount === 'string' && /^(0|[1-9]\d*)(\.\d+)?$/.test(body.amount), 'AMOUNT_MUST_BE_DECIMAL_STRING');
@@ -82,6 +87,7 @@ class Merchant {
       requireValue(Number.isInteger(ttl) && ttl >= 1 && ttl <= 604800, 'INVALID_EXPIRY');
       const previous = this.store.reference(body.reference);
       if (previous) {
+        requireValue(!epay || quote.orderId === previous.id, 'EPAY_REFERENCE_CONFLICT', 409);
         requireValue(previous.token === token.address && previous.expectedUnits === units.toString()
           && previous.ttl === ttl && previous.webhookUrl === (body.webhookUrl || ''), 'REFERENCE_CONFLICT', 409);
         return previous;
@@ -96,7 +102,19 @@ class Merchant {
         chainId: chain.config.chainId, factory: chain.config.factory, webhookUrl: body.webhookUrl || '',
         status: 'WAITING', paid: false, generation: 0, stateVersion: 0,
         receivedUnits: '0', confirmedUnits: '0', lateUnits: '0', otherTokens: [] };
-      this.store.saveOrder(o);
+      if (quote) {
+        this.store.transaction(() => {
+          requireValue(!quote.orderId, 'EPAY_REFERENCE_CONFLICT', 409);
+          quote.orderId = id;
+          this.store.saveOrder(o);
+          this.store.saveEpay(quote);
+        });
+      } else {
+        // A signed request can reserve its reference while native creation is awaiting the RPC.
+        requireValue(!o.reference.startsWith(SOURCE_PREFIX) || !this.store.epayReference(o.reference),
+          'REFERENCE_RESERVED_BY_EPAY', 409);
+        this.store.saveOrder(o);
+      }
       return o;
     });
   }
@@ -121,6 +139,7 @@ class Merchant {
       if (o.status !== oldStatus || wasPaid !== o.paid) o.stateVersion++;
       if (!wasPaid && o.paid) o.generation++;
       this.store.saveOrder(o);
+      if (wasPaid !== o.paid) recordNativePayment(this.store, o);
       if (wasPaid !== o.paid && o.webhookUrl) {
         const type = o.paid ? 'payment.paid' : 'payment.reversed';
         const id = `${o.id}:${o.generation}:${type}`;

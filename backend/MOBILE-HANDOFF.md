@@ -1,5 +1,7 @@
 # 手机单次归集
 
+**简体中文** | [English](MOBILE-HANDOFF.en.md)
+
 新用户先读 [用户操作手册](../docs/OPERATIONS.md)。本页是专用手机归集能力链接，不是桌面 WalletConnect；专用错链找回暂不支持该手机入口，须在桌面使用注入钱包或 WalletConnect。
 
 ## 使用流程

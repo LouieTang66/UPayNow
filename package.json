@@ -1,7 +1,7 @@
 {
   "name": "upaynow-product",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "scripts": {
     "test": "npm run compile && hardhat run --no-compile test/self-hosted.cjs && npm run test:crosschain && npm run test:compat && npm run test:product",
     "test:crosschain": "node --test test/deterministic-release.test.cjs && node test/crosschain.cjs",

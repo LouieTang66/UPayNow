@@ -1,5 +1,7 @@
 # UPayNow 页面、服务与认证边界
 
+**简体中文** | [English](INTEGRATION.en.md)
+
 ## 启动和路由
 
 项目根目录运行 `npm ci && npm start`。首次实例没有已接入部署、Factory、payout、币种或订单，先登录并从内置已开放网络添加自己的部署；网络预设不等于现成商户合约。构建入口 `npm run build`；构建产物为 `frontend-v2/dist`，管理台与公开页面由各自后台服务挂载，不需要独立前端服务器。
@@ -35,8 +37,8 @@
 
 重新构建或替换页面不应删除状态、密钥、历史部署、订单和交易哈希，也不会升级链上不可变合约。备份、更新、代理和进程托管均由部署者负责，不新增内建运维产品，不允许两进程共享同一数据目录。
 
-实体钱包、WalletConnect relay、手机内置浏览器、EIP-681、目标链和真实 HTTPS 都需独立确认。前端改善不能自动消除历史后端候选哈希、RPC 秘密、deploymentId 冲突或崩溃恢复风险；这些是 [安全文档](../docs/SECURITY.md) 中的待最终复核线索，不作为已修复声明。
+实体钱包、WalletConnect relay、手机内置浏览器、EIP-681、目标链和真实 HTTPS 都需独立确认。前端改善不能自动消除历史后端候选哈希、RPC 秘密、deploymentId 冲突或崩溃恢复风险；这些是 [安全文档](../docs/SECURITY.md) 中的待复核事项。
 
 ## 开发者自动化检查
 
-`npm run test:frontend-v2`、`npm run test:backend` 和 `npm test` 分别是前端、后端和合约回归入口。检查应使用隔离数据，不属于用户充值/付款步骤，不代替实体手机、生产 TLS、主网或独立审计验收。
+`npm run test:frontend-v2`、`npm run test:backend` 和 `npm test` 分别是前端、后端和合约回归入口。检查应使用隔离数据。

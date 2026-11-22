@@ -1,6 +1,8 @@
 # Cross-chain deterministic deployments (v2)
 
-This is the scheme used for all new merchant deployments, not an upgrade of existing on-chain contracts. Legacy CREATE deployments remain supported for historical import/recovery, with their original order hashes, payment accounting and immutable collection destinations; creating new legacy deployments is disabled. Existing addresses do not acquire recoverability by upgrading the application. Merchant procedures are in the [user operations guide](OPERATIONS.md); this document retains the technical deployment and recovery boundaries.
+[简体中文](CROSSCHAIN-V2.zh-CN.md) | **English**
+
+This is the scheme used for all new merchant deployments, not an upgrade of existing on-chain contracts. Legacy CREATE deployments remain supported for historical import/recovery, with their original order hashes, payment accounting and immutable collection destinations; creating new legacy deployments is disabled. Existing addresses do not acquire recoverability by upgrading the application. Merchant procedures are in the [user operations guide](OPERATIONS.en.md); this document retains the technical deployment and recovery boundaries.
 
 ## Address construction
 
@@ -29,11 +31,11 @@ Factory reuse validates the complete existing identity and exact ordered token r
 
 The merchant UI selects an admitted network and fills its default RPC, Chain ID and native gas symbol. An advanced HTTPS RPC override does not admit another network or bypass code verification. New-job requests accept only deterministic-v2 (omitting the scheme also creates v2); legacy-v1 is available only for historical import/recovery. The backend admission list is available at `GET /api/deployment-networks`.
 
-Network operators predeploy and verify the public root with the [isolated public deployer](../ops-public-deployer/README.md). The ordinary backend rejects new bootstrap jobs, even with an admin Bearer, with 403 `PUBLIC_BOOTSTRAP_OPS_ONLY`. Historical bootstrap-job recovery paths remain available. Merchants do not bootstrap the root as a preliminary transaction: missing or invalid public code blocks merchant deployment. Admission policy and real-time chain/code verification are separate requirements; an arbitrary RPC or successful operator bootstrap does not itself open a network for merchants.
+Network operators predeploy and verify the public root with the [isolated public deployer](../ops-public-deployer/README.en.md). The ordinary backend rejects new bootstrap jobs, even with an admin Bearer, with 403 `PUBLIC_BOOTSTRAP_OPS_ONLY`. Historical bootstrap-job recovery paths remain available. Merchants do not bootstrap the root as a preliminary transaction: missing or invalid public code blocks merchant deployment. Admission policy and real-time chain/code verification are separate requirements; an arbitrary RPC or successful operator bootstrap does not itself open a network for merchants.
 
 Deterministic calls have a `to` address: operator bootstrap calls the verified singleton; merchant creation calls the verified deterministic root and requires `from == payout` plus gas on that chain. Existing legacy creation transactions have no `to`. Wallet intent validation distinguishes these cases rather than disabling recipient validation. Exact network, sender, value, calldata, target and receipt/block verification remain mandatory. UNKNOWN is not failure and does not trigger automatic resend. The dedicated mobile deployment flow permits a restricted, explicit wallet re-prompt for the same approved job/identity before its original deadline when no hash is known; it is not proof that the original attempt was never broadcast.
 
-Merchant creation supports injected desktop wallets, desktop WalletConnect, or a dedicated mobile capability link. WalletConnect requires the merchant's Reown Project ID, which can be saved before any deployment exists; the dedicated phone entry does not require it. Fixed HTTPS phone origins need no cloudflared. Temporary entries prepare the pinned, checksum-verified official component on demand and do not open on ordinary startup; see [component details](../backend/CLOUDFLARED.md).
+Merchant creation supports injected desktop wallets, desktop WalletConnect, or a dedicated mobile capability link. WalletConnect requires the merchant's Reown Project ID, which can be saved before any deployment exists; the dedicated phone entry does not require it. Fixed HTTPS phone origins need no cloudflared. Temporary entries prepare the pinned, checksum-verified official component on demand and do not open on ordinary startup; see [component details](../backend/CLOUDFLARED.en.md).
 
 Successful root bootstrap is not a merchant deployment and must not register an empty Factory. Successful merchant deployment requires the expected event, runtime, immutable payout/implementation/codehash, whitelist and sufficient confirmations before registration.
 
@@ -48,8 +50,6 @@ Dedicated recovery requires the target payout wallet to sign and have target-cha
 The recovery UI must freeze the target deployment and original order identity throughout wallet approval. Changing wallet network or deployment selection must not redirect the transaction. A missing hash remains an unknown outcome requiring reconciliation, not evidence that sending again is safe.
 
 ## Acceptance requirements
-
-The following is an acceptance checklist, not a report that these tests were executed or passed during this documentation update.
 
 Use two independent local EVM chains with distinct chain IDs, distinct merchant transaction nonces and different approved token CAs. Bootstrap the same pinned deterministic deployer, demonstrate equal Factory/implementation/order addresses, transfer a real test token into the target-chain counterfactual address before code exists, then execute deployment and recovery to the fixed payout.
 

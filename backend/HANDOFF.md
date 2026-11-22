@@ -1,5 +1,7 @@
 # 手机能力入口与异常恢复
 
+**简体中文** | [English](HANDOFF.en.md)
+
 手机归集使用 `/c/:id#capability`，手机部署使用 `/d/:id#capability`，分别由独立受限服务提供；使用步骤见 [手机归集](MOBILE-HANDOFF.md)和[部署/导入](MULTICHAIN.md)。这不是顾客收银台，也不是管理员登录入口。
 
 面向新用户的完整流程见 [用户操作手册](../docs/OPERATIONS.md)。手机专用能力链接不同于桌面 WalletConnect；后者需要自己的 Reown Project ID（可先保存，不要求已有部署）。专用错链找回不支持本手机入口，可用桌面注入钱包或桌面 WalletConnect。

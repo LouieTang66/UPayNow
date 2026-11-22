@@ -1,5 +1,7 @@
 # 第三方与发行声明
 
+**简体中文** | [English](THIRD_PARTY_NOTICES.en.md)
+
 项目自有部分选用的 ELv2 不替代以下组件的许可。核心合约的历史标识和待核查范围见[许可范围说明](docs/LICENSE_SCOPE.md)。下表说明本仓库当前直接使用或引用的主要组件；它不是所有传递依赖的完整合规清单，也不是法律或独立安全审计结论。
 
 ## WalletConnect / Reown

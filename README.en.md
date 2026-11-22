@@ -15,10 +15,10 @@ Your server does not store wallet private keys. Contract deployments and fund co
 
 <p>
 <a href="#quick-start">Quick start</a> ·
-<a href="docs/INSTALLATION.md">Installation</a> ·
-<a href="docs/OPERATIONS.md">Merchant guide</a> ·
-<a href="backend/README.md">API integration</a> ·
-<a href="docs/SECURITY.md">Security</a>
+<a href="docs/INSTALLATION.en.md">Installation</a> ·
+<a href="docs/OPERATIONS.en.md">Merchant guide</a> ·
+<a href="backend/README.en.md">API integration</a> ·
+<a href="docs/SECURITY.en.md">Security</a>
 </p>
 
 </div>
@@ -67,6 +67,10 @@ Create order → Pay → Confirm on-chain → Notify store → Fulfill order
 
 Payment confirmation and fund collection are independent. The store can process confirmed orders without waiting for collection to finish.
 
+## EPay compatibility
+
+UPayNow offers an opt-in EPay-compatible entry point for USDT checkout while retaining one address per order. Prices must already be denominated in USDT; the adapter does not convert currencies. The current target is the New API top-up flow in legacy MD5 mode; this does not add Alipay, WeChat Pay, or universal EPay compatibility. See the [EPay setup guide](docs/EPAY.en.md).
+
 ## Quick start
 
 ### 1. Install and start
@@ -82,7 +86,7 @@ The default administration URL is `http://127.0.0.1:8790`. On first startup, use
 
 ### 2. Configure a payment network
 
-Open **链与合约** (chains and contracts), click **添加链** (add chain), and select an available network. RPC, Chain ID, and the native Gas token symbol are filled in automatically; you do not need to enter them manually. Enter your fixed payout wallet and the exact token contract addresses, then review the required payment confirmations. Custom RPC configuration is optional and available in advanced settings.
+Open **Chains and contracts**, click **Add Chain**, and select an available network. RPC, Chain ID, and the native Gas token symbol are filled in automatically; you do not need to enter them manually. Enter your fixed payout wallet and the exact token contract addresses, then review the required payment confirmations. Custom RPC configuration is optional and available in advanced settings.
 
 Use the fixed payout wallet to approve deployment of the merchant contracts and pay the network Gas fee. The shared deployment entrypoint is prepared by the maintainer; merchants do not need to deploy it separately. You may also import existing contracts that have been verified as compatible with the current version.
 
@@ -94,7 +98,7 @@ Use separate API credentials to create payment orders, direct customers to the c
 
 Test the complete order creation, payment, notification, and collection flow on a testnet before connecting production business operations.
 
-Before production deployment, follow [Installation and HTTPS deployment](docs/INSTALLATION.md) to configure persistent data storage and access. See the [Merchant guide](docs/OPERATIONS.md) for step-by-step instructions, [Authentication](docs/AUTHENTICATION.md) for password setup and recovery, and the [API documentation](backend/README.md) for store integration. Other technical guides are listed in the [Documentation index](docs/README.md). These detailed guides are currently in Chinese.
+Before production deployment, follow [Installation and HTTPS deployment](docs/INSTALLATION.en.md) to configure persistent data storage and access. See the [Merchant guide](docs/OPERATIONS.en.md) for step-by-step instructions, [Authentication](docs/AUTHENTICATION.en.md) for password setup and recovery, and the [API documentation](backend/README.en.md) for store integration. Other technical guides are listed in the [Documentation index](docs/README.en.md).
 
 ## Supported networks and network requests
 
@@ -148,7 +152,7 @@ The recovery key is not a substitute for business-data backups. Copying a single
 
 Keeping wallet private keys off the server does not eliminate the need for server security. Configure HTTPS, restrict access to the administration interface, and protect checkout pages against payment-address tampering.
 
-See [Security](docs/SECURITY.md) for deployment requirements and security boundaries.
+See [Security](docs/SECURITY.en.md) for deployment requirements and security boundaries.
 
 ## Feedback and contact
 
@@ -181,6 +185,6 @@ Without separate authorization, you may not provide the software to third partie
 
 **Contact: email: hi@louie66.com Telegram: @Louie_66**
 
-Third-party components remain subject to their respective licenses, and their existing copyright and license notices must be preserved. See [Third-party and build licensing notices](THIRD_PARTY_NOTICES.md). WalletConnect 2.26.0 has a separate community license and must not be treated as MIT-licensed or as permitting unrestricted free commercial use. A separate commercial authorization from this project does not waive third-party terms. This is a summary; the applicable license texts govern the full rights, restrictions, and obligations.
+Third-party components remain subject to their respective licenses, and their existing copyright and license notices must be preserved. See [Third-party and build licensing notices](THIRD_PARTY_NOTICES.en.md). WalletConnect 2.26.0 has a separate community license and must not be treated as MIT-licensed or as permitting unrestricted free commercial use. A separate commercial authorization from this project does not waive third-party terms. This is a summary; the applicable license texts govern the full rights, restrictions, and obligations.
 
 Portions © 2025 Reown, Inc. All Rights Reserved

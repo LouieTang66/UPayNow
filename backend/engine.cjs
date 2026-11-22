@@ -8,7 +8,7 @@ const { AppError } = require('./chain.cjs');
 
 async function createEngine(dir, options = {}) {
   const store = new Store(dir);
-  let merchant, handoff, hooks, timer, closing = false, worker = Promise.resolve(), delivery = Promise.resolve();
+  let merchant, handoff, hooks, timer, epay, closing = false, worker = Promise.resolve(), delivery = Promise.resolve();
   try {
     hooks = new Webhooks(store, { hosts: options.webhookHosts || (process.env.UPAY_WEBHOOK_HOSTS || '').split(',').filter(Boolean), allowLocal: !!options.allowLocalWebhook });
     const validateWebhook = url => new Promise((resolve, reject) => {
@@ -23,7 +23,10 @@ async function createEngine(dir, options = {}) {
     }
     const deliver = () => {
       if (closing || hooks.running) return delivery;
-      delivery = hooks.tick().catch(error => store.set('webhookError', error.code || 'WEBHOOK_DELIVERY_FAILED'));
+      delivery = Promise.all([
+        hooks.tick().catch(error => store.set('webhookError', error.code || 'WEBHOOK_DELIVERY_FAILED')),
+        epay?.tick().catch(() => store.set('epay.deliveryError', 'EPAY_DELIVERY_WORKER_FAILED')),
+      ]);
       return delivery;
     };
     const tick = () => {
@@ -33,10 +36,10 @@ async function createEngine(dir, options = {}) {
       }).catch(error => store.set('scanWorkerError', error.code || 'CHAIN_RPC_ERROR'));
     };
     if ((options.pollMs ?? 5000) > 0) timer = setInterval(tick, options.pollMs ?? 5000);
-    return { store, merchant, wallet, handoff, hooks, deliver,
+    return { store, merchant, wallet, handoff, hooks, deliver, attachEpay: adapter => { epay = adapter; },
       close: async () => {
         if (closing) return; closing = true; clearInterval(timer);
-        await hooks.close(); await Promise.all([worker, delivery]);
+        await Promise.all([hooks.close(), epay?.close()]); await Promise.all([worker, delivery]);
         await handoff?.close(); merchant.close(); store.close();
       } };
   } catch (error) {

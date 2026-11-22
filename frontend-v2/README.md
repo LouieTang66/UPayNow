@@ -1,5 +1,7 @@
 # UPayNow 用户界面
 
+**简体中文** | [English](README.en.md)
+
 这是 UPayNow 的管理台、顾客收银台和手机钱包确认页面。项目仓库：<https://github.com/LouieTang66/UPayNow>。页面使用同源真实服务数据，接口错误不能以虚构订单、余额或成功状态替代。
 
 ## 首次使用
@@ -34,4 +36,4 @@
 
 ## 开发者：构建与检查
 
-构建入口为项目根目录 `npm run build`；前端输出位于 `frontend-v2/dist`，正式服务直接挂载该产物。钱包适配器由本前端独立打包。`npm run test:frontend-v2` 是开发者回归入口，不属于用户付款/充值步骤，也不代表实体钱包、TLS 或主网验收。
+构建入口为项目根目录 `npm run build`；前端输出位于 `frontend-v2/dist`，正式服务直接挂载该产物。钱包适配器由本前端独立打包。`npm run test:frontend-v2` 运行前端回归测试。
