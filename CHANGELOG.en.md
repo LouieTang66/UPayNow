@@ -2,7 +2,7 @@
 
 [简体中文](CHANGELOG.md) | **English**
 
-## 0.2.0 (unreleased)
+## 0.2.0
 
 ### Features
 
